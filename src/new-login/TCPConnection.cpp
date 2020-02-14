@@ -6,7 +6,7 @@
  */
 
 #include "TCPConnection.h"
-#include "Debuggnig.h"
+#include "Debugging.h"
 
 #ifdef _WIN32
 #define SHUT_RD   SD_RECEIVE

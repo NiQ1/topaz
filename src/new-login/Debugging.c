@@ -5,7 +5,7 @@
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#include "Debuggnig.h"
+#include "Debugging.h"
 
 #include <malloc.h>
 #include <string.h>

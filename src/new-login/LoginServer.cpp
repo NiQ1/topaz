@@ -6,7 +6,7 @@
  */
 
 #include "LoginServer.h"
-#include "Debuggnig.h"
+#include "Debugging.h"
 
 #include <stdexcept>
 #include <thread>
