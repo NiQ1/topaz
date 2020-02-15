@@ -46,12 +46,24 @@ public:
 	 *	Run the server and serve connections until Shutdown() is called
 	 *	from a different thread.
 	 */
-	void RunServer();
+	void Run();
+
+    /**
+     *  Returns whether the handler is currently running.
+     *  @return True if currently running, false otherwise.
+     */
+    bool IsRunning() const;
+
+    /**
+     *  Start the server in a separate thread. You should generally call this
+     *  instead of run.
+     */
+    void StartThread();
 
 	/**
 	 *	Shut down the server and close all connections and listening sockets.
 	 */
-	void Shutdown();
+	void Shutdown(bool bJoin = true);
 
 private:
 	/// Current listening sockets
@@ -62,6 +74,14 @@ private:
 	bool mbShutdown;
 	/// Whether server is currently running
 	bool mbRunning;
+    /// Associated thread object
+    std::shared_ptr<std::thread> mpThreadObj;
+
+    /**
+     *  Static wrapper to Run, in order to allow it to run from std::thread
+     *  @param thisobj Needs to point to an already initializaed instance of this class.
+     */
+    static void stRun(LoginServer* thisobj);
 };
 
 #endif

@@ -81,7 +81,7 @@ private:
         const char* pszDatabase);
 
     /// Static database singleton pointer
-    static DatabasePtr smpDatabase;
+    static DatabasePtr smpSingletonObj;
 
     /// MariaDB++ connection handle
     mariadb::connection_ref mpConnection;

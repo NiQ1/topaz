@@ -38,27 +38,33 @@ extern "C"
 	 *	Print a message to the log file specified with var_args
 	 *	@param szFileName File name of the source code calling file
 	 *	@param iLineNo Line number in the source code
+     *  @param szFuncName Calling function name
 	 *	@param eSeverity Severity level of the log message
 	 *	@param pszFormat printf compatible format string
 	 *	@param vaArgs Message arguments
 	 *	@return Number of bytes written to log
 	 */
-	int LogPrintV(const char* szFileName, int iLineNo, LOG_SEVERITY_LEVEL eSeverity, const char* pszFormat, va_list vaArgs);
+	int LogPrintV(const char* szFileName, int iLineNo, const char* szFunctionName, LOG_SEVERITY_LEVEL eSeverity, const char* pszFormat, va_list vaArgs);
 
 	/**
 	 *	Print a message to the log file
 	 *	@param szFileName File name of the source code calling file
 	 *	@param iLineNo Line number in the source code
-	 *	@param eSeverity Severity level of the log message
+     *  @param szFuncName Calling function name
+     *	@param eSeverity Severity level of the log message
 	 *	@param pszFormat printf compatible format string
 	 *	@param ... Message arguments
 	 *	@return Number of bytes written to log
 	 */
-	int LogPrint(const char* szFileName, int iLineNo, LOG_SEVERITY_LEVEL eSeverity, const char* pszFormat, ...);
+	int LogPrint(const char* szFileName, int iLineNo, const char* szFunctionName, LOG_SEVERITY_LEVEL eSeverity, const char* pszFormat, ...);
 
 
 	// Easy to use macro definitions
-#define LOG_MESSAGE(sev, msg, ...) LogPrint(__FILE__, __LINE__, sev, msg, ##__VA_ARGS__)
+#if _DEBUG || DEBUG || ENABLE_DEBUG_LOGS
+#define LOG_MESSAGE(sev, msg, ...) LogPrint(__FILE__, __LINE__, __FUNCTION__, sev, msg, ##__VA_ARGS__)
+#else
+#define LOG_MESSAGE(sev, msg, ...) LogPrint(NULL, 0, NULL, sev, msg, ##__VA_ARGS__)
+#endif
 #define LOG_CRITICAL(msg, ...) LOG_MESSAGE(LOG_SEVERITY_CRITICAL, msg, ##__VA_ARGS__)
 #define LOG_ERROR(msg, ...) LOG_MESSAGE(LOG_SEVERITY_ERROR, msg, ##__VA_ARGS__)
 #define LOG_WARNING(msg, ...) LOG_MESSAGE(LOG_SEVERITY_WARNING, msg, ##__VA_ARGS__)

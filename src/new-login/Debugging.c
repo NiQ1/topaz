@@ -13,7 +13,7 @@
 LOG_SEVERITY_LEVEL geLogLevel = LOG_SEVERITY_DEBUG0;
 FILE* ghLogFile = NULL;
 
-int LogPrintV(const char* szFileName, int iLineNo, LOG_SEVERITY_LEVEL eSeverity, const char* pszFormat, va_list vaArgs)
+int LogPrintV(const char* szFileName, int iLineNo, const char* szFunctionName, LOG_SEVERITY_LEVEL eSeverity, const char* pszFormat, va_list vaArgs)
 {
 	// Actual format string to write
 	char* pszActualFormat = NULL;
@@ -54,7 +54,12 @@ int LogPrintV(const char* szFileName, int iLineNo, LOG_SEVERITY_LEVEL eSeverity,
 
 	// Get the "real" format string, i.e. including file name, line number and severity level
 	// Note, this is still not the real log message (vaArgs not expanded yet)
-	iBytesNeeded = snprintf(szActualFormatTmp, sizeof(szActualFormatTmp), "[%s][%s:%d] %s\n", szSeverityLevel, szFileName, iLineNo, pszFormat);
+	if ((szFunctionName) && (szFileName) && (szFunctionName)) {
+		iBytesNeeded = snprintf(szActualFormatTmp, sizeof(szActualFormatTmp), "[%s][%s][%s:%d] %s\n", szSeverityLevel, szFunctionName, szFileName, iLineNo, pszFormat);
+	}
+	else {
+		iBytesNeeded = snprintf(szActualFormatTmp, sizeof(szActualFormatTmp), "[%s] %s\n", szSeverityLevel, pszFormat);
+	}
 	if (iBytesNeeded <= 0) {
 		return iBytesNeeded;
 	}
@@ -65,7 +70,12 @@ int LogPrintV(const char* szFileName, int iLineNo, LOG_SEVERITY_LEVEL eSeverity,
 			return -1;
 		}
 		// Allocation guarantees enough buffer for format string including terminator
-		iBytesNeeded = snprintf(pszActualFormat, iBytesNeeded + 1, "[%s][%s:%d] %s\n", szSeverityLevel, szFileName, iLineNo, pszFormat);
+		if ((szFunctionName) && (szFileName) && (szFunctionName)) {
+			iBytesNeeded = snprintf(pszActualFormat, iBytesNeeded + 1, "[%s][%s][%s:%d] %s\n", szSeverityLevel, szFunctionName, szFileName, iLineNo, pszFormat);
+		}
+		else {
+			iBytesNeeded = snprintf(pszActualFormat, iBytesNeeded + 1, "[%s] %s\n", szSeverityLevel, pszFormat);
+		}
 		if (iBytesNeeded <= 0) {
 			return iBytesNeeded;
 		}
@@ -101,13 +111,13 @@ int LogPrintV(const char* szFileName, int iLineNo, LOG_SEVERITY_LEVEL eSeverity,
 	return iBytesNeeded;
 }
 
-int LogPrint(const char* szFileName, int iLineNo, LOG_SEVERITY_LEVEL eSeverity, const char* pszFormat, ...)
+int LogPrint(const char* szFileName, int iLineNo, const char* szFunctionName, LOG_SEVERITY_LEVEL eSeverity, const char* pszFormat, ...)
 {
 	va_list vaArg;
 	int iWritten = 0;
 
 	va_start(vaArg, pszFormat);
-	iWritten = LogPrintV(szFileName, iLineNo, eSeverity, pszFormat, vaArg);
+	iWritten = LogPrintV(szFileName, iLineNo, szFunctionName, eSeverity, pszFormat, vaArg);
 	va_end(vaArg);
 	return iWritten;
 }

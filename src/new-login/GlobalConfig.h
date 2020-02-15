@@ -31,21 +31,42 @@ public:
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    std::string GetConfigString(std::string& strConfigName);
+    std::string GetConfigString(const std::string& strConfigName);
+
+    /**
+     *  Get a string type configuration value.
+     *  @param strConfigName Name of the configuration value to fetch
+     *  @return The configuration value content
+     */
+    std::string GetConfigString(const char* pszConfigName);
 
     /**
      *  Get an interger type configuration value.
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    int32_t GetConfigInt(std::string& strConfigName);
+    int32_t GetConfigInt(const std::string& strConfigName);
+
+    /**
+     *  Get an interger type configuration value.
+     *  @param strConfigName Name of the configuration value to fetch
+     *  @return The configuration value content
+     */
+    int32_t GetConfigInt(const char* pszConfigName);
 
     /**
      *  Get an unsigned interger type configuration value.
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    uint32_t GetConfigUInt(std::string& strConfigName);
+    uint32_t GetConfigUInt(const std::string& strConfigName);
+
+    /**
+     *  Get an unsigned interger type configuration value.
+     *  @param strConfigName Name of the configuration value to fetch
+     *  @return The configuration value content
+     */
+    uint32_t GetConfigUInt(const char* pszConfigName);
 
     /**
      *  Get an instance of the configuration. The object is created
@@ -98,7 +119,7 @@ private:
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    std::string GetDefaultValue(std::string& strConfigName);
+    std::string GetDefaultValue(const std::string& strConfigName);
 
     /// Hashmap containing all configuration string values read to far
     std::unordered_map<std::string, std::string> mmapStringVals;
@@ -111,7 +132,7 @@ private:
     FILE* mhConfigFile;
 
     /// Current singleton object
-    static GlobalConfigPtr smSingletonObj;
+    static GlobalConfigPtr smpSingletonObj;
 };
 
 #endif

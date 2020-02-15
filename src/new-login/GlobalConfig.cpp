@@ -8,13 +8,14 @@
 #include "GlobalConfig.h"
 #include "Debugging.h"
 
+GlobalConfigPtr GlobalConfig::smpSingletonObj = NULL;
+
 GlobalConfig::GlobalConfig()
 {
     LOG_INFO("Using default configuration file: " DEFAULT_CONFIG_FILE_NAME);
     mhConfigFile = fopen(DEFAULT_CONFIG_FILE_NAME, "r");
     if (mhConfigFile == NULL) {
-        LOG_CRITICAL("Could not open configuration file.");
-        throw std::runtime_error("Could not open configuration file.");
+        LOG_WARNING("Could not open configuration file, falling back to default values.");
     }
 }
 
@@ -23,8 +24,7 @@ GlobalConfig::GlobalConfig(std::string& strConfigFileName)
     LOG_INFO("Using configuration file: %s", strConfigFileName.c_str());
     mhConfigFile = fopen(strConfigFileName.c_str(), "r");
     if (mhConfigFile == NULL) {
-        LOG_CRITICAL("Could not open configuration file.");
-        throw std::runtime_error("Could not open configuration file.");
+        LOG_WARNING("Could not open configuration file, falling back to default values.");
     }
 }
 
@@ -33,7 +33,12 @@ GlobalConfig::~GlobalConfig()
     Destroy();
 }
 
-std::string GlobalConfig::GetConfigString(std::string& strConfigName)
+std::string GlobalConfig::GetConfigString(const char* pszConfigName)
+{
+    return GetConfigString(std::string(pszConfigName));
+}
+
+std::string GlobalConfig::GetConfigString(const std::string& strConfigName)
 {
     LOG_DEBUG0("Called.");
     // May already be cached
@@ -43,42 +48,44 @@ std::string GlobalConfig::GetConfigString(std::string& strConfigName)
         LOG_DEBUG1("Value found in cache: %s", strVal->first);
         return strVal->first;
     }
-    LOG_DEBUG0("Value not in cache, searching file.");
-    // Not found in cache so read from file
-    fseek(mhConfigFile, 0, SEEK_SET);
-    // Should be enough to hold a single line
-    char configFileLine[1024] = { 0 };
-    // Lines are in the format name=value
-    char* equalSignPos = NULL;
-    std::string configName;
-    std::string configVal;
-    // Keep track of configuration line numbers for logging
-    int linenum = 0;
-    while (fgets(configFileLine, sizeof(configFileLine) - 1, mhConfigFile) != NULL) {
-        if (configFileLine[0] == ';') {
-            // Skip comments
-            continue;
+    if (mhConfigFile) {
+        LOG_DEBUG0("Value not in cache, searching file.");
+        // Not found in cache so read from file
+        fseek(mhConfigFile, 0, SEEK_SET);
+        // Should be enough to hold a single line
+        char configFileLine[1024] = { 0 };
+        // Lines are in the format name=value
+        char* equalSignPos = NULL;
+        std::string configName;
+        std::string configVal;
+        // Keep track of configuration line numbers for logging
+        int linenum = 0;
+        while (fgets(configFileLine, sizeof(configFileLine) - 1, mhConfigFile) != NULL) {
+            if (configFileLine[0] == ';') {
+                // Skip comments
+                continue;
+            }
+            equalSignPos = strchr(configFileLine, '=');
+            if (equalSignPos == NULL) {
+                LOG_WARNING("Skipping malformed configuration line: %d.", linenum);
+                continue;
+            }
+            // Break into name and value
+            *equalSignPos = '\0';
+            equalSignPos++;
+            configName = configFileLine;
+            configVal = equalSignPos;
+            // Trim whitespaces
+            trim(configName);
+            trim(configVal);
+            if (configName == strConfigName) {
+                // Found it, add to cache
+                mmapStringVals[strConfigName] = configVal;
+                LOG_DEBUG1("Value found in file: %s", configVal);
+                return configVal;
+            }
+            linenum++;
         }
-        equalSignPos = strchr(configFileLine, '=');
-        if (equalSignPos == NULL) {
-            LOG_WARNING("Skipping malformed configuration line: %d.", linenum);
-            continue;
-        }
-        // Break into name and value
-        *equalSignPos = '\0';
-        equalSignPos++;
-        configName = configFileLine;
-        configVal = equalSignPos;
-        // Trim whitespaces
-        trim(configName);
-        trim(configVal);
-        if (configName == strConfigName) {
-            // Found it, add to cache
-            mmapStringVals[strConfigName] = configVal;
-            LOG_DEBUG1("Value found in file: %s", configVal);
-            return configVal;
-        }
-        linenum++;
     }
     // Fallback to default value
     try {
@@ -90,7 +97,12 @@ std::string GlobalConfig::GetConfigString(std::string& strConfigName)
     throw std::runtime_error("Missing configuration value.");
 }
 
-int32_t GlobalConfig::GetConfigInt(std::string& strConfigName)
+int32_t GlobalConfig::GetConfigInt(const char* pszConfigName)
+{
+    return GetConfigInt(std::string(pszConfigName));
+}
+
+int32_t GlobalConfig::GetConfigInt(const std::string& strConfigName)
 {
     LOG_DEBUG0("Called.");
     std::string configValAsString = GetConfigString(strConfigName);
@@ -107,7 +119,12 @@ int32_t GlobalConfig::GetConfigInt(std::string& strConfigName)
     return iIntVal;
 }
 
-uint32_t GlobalConfig::GetConfigUInt(std::string& strConfigName)
+uint32_t GlobalConfig::GetConfigUInt(const char* pszConfigName)
+{
+    return GetConfigUInt(std::string(pszConfigName));
+}
+
+uint32_t GlobalConfig::GetConfigUInt(const std::string& strConfigName)
 {
     LOG_DEBUG0("Called.");
     std::string configValAsString = GetConfigString(strConfigName);
@@ -126,31 +143,31 @@ uint32_t GlobalConfig::GetConfigUInt(std::string& strConfigName)
 
 GlobalConfigPtr GlobalConfig::GetInstance()
 {
-    if (smSingletonObj == NULL) {
-        smSingletonObj = new GlobalConfig();
+    if (smpSingletonObj == NULL) {
+        smpSingletonObj = new GlobalConfig();
     }
-    return smSingletonObj;
+    return smpSingletonObj;
 }
 
 GlobalConfigPtr GlobalConfig::GetInstance(std::string& strConfigFileName)
 {
-    if (smSingletonObj == NULL) {
-        smSingletonObj = new GlobalConfig(strConfigFileName);
+    if (smpSingletonObj == NULL) {
+        smpSingletonObj = new GlobalConfig(strConfigFileName);
     }
-    return smSingletonObj;
+    return smpSingletonObj;
 }
 
 void GlobalConfig::Destroy()
 {
-    if (smSingletonObj == NULL) {
+    if (smpSingletonObj == NULL) {
         return;
     }
-    if (smSingletonObj->mhConfigFile) {
-        fclose(smSingletonObj->mhConfigFile);
-        smSingletonObj->mhConfigFile = NULL;
+    if (smpSingletonObj->mhConfigFile) {
+        fclose(smpSingletonObj->mhConfigFile);
+        smpSingletonObj->mhConfigFile = NULL;
     }
-    delete smSingletonObj;
-    smSingletonObj = NULL;
+    delete smpSingletonObj;
+    smpSingletonObj = NULL;
 }
 
 void GlobalConfig::trim(std::string& str)
@@ -166,7 +183,7 @@ void GlobalConfig::trim(std::string& str)
     }
 }
 
-std::string GlobalConfig::GetDefaultValue(std::string& strConfigName)
+std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
 {
     LOG_DEBUG0("Called.");
     if (strConfigName == "db_server") {
@@ -183,6 +200,12 @@ std::string GlobalConfig::GetDefaultValue(std::string& strConfigName)
     }
     else if (strConfigName == "db_password") {
         return "topaz";
+    }
+    else if (strConfigName == "login_port") {
+        return "54230";
+    }
+    else if (strConfigName == "login_ip") {
+        return "0.0.0.0";
     }
     LOG_ERROR("No default configuration value found.");
     throw std::runtime_error("Configuration value does not have a hardcoded default");

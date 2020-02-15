@@ -78,7 +78,7 @@ void LoginServer::AddBind(uint16_t wPortNum, const char* szIpAddress, bool bSecu
 	mvecListeningSockets.push_back(NewBind);
 }
 
-void LoginServer::RunServer()
+void LoginServer::Run()
 {
 	// Socket descriptors used for select call
 	fd_set SocketDescriptors;
@@ -156,7 +156,22 @@ void LoginServer::RunServer()
 	mbRunning = false;
 }
 
-void LoginServer::Shutdown()
+bool LoginServer::IsRunning() const
+{
+    return mbRunning;
+}
+
+void LoginServer::StartThread()
+{
+    LOG_DEBUG0("Called.");
+    if (mpThreadObj != NULL) {
+        LOG_ERROR("LoginServer thread already running!");
+        throw std::runtime_error("Thread already running");
+    }
+    mpThreadObj = std::shared_ptr<std::thread>(new std::thread(stRun, this));
+}
+
+void LoginServer::Shutdown(bool bJoin)
 {
 	LOG_DEBUG0("Called.");
 	if (mbShutdown == false) {
@@ -172,6 +187,16 @@ void LoginServer::Shutdown()
 			mvecWorkingHandlers.back()->Shutdown();
 			mvecWorkingHandlers.pop_back();
 		}
-	}
+        if ((bJoin) && (mpThreadObj) && (mpThreadObj->joinable())) {
+            mpThreadObj->join();
+            mpThreadObj = NULL;
+            LOG_DEBUG0("Thread joined.");
+        }
+    }
 	LOG_INFO("Server successfully shut down.");
+}
+
+void LoginServer::stRun(LoginServer* thisobj)
+{
+    thisobj->Run();
 }

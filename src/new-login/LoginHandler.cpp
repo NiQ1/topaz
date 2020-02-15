@@ -48,6 +48,7 @@ void LoginHandler::Shutdown(bool bJoin)
             if ((bJoin) && (mpThreadObj) && (mpThreadObj->joinable())) {
                 mpThreadObj->join();
                 mpThreadObj = NULL;
+                LOG_DEBUG0("Thread joined.");
             }
         }
         mConnection.Close();

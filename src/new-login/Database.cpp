@@ -9,34 +9,36 @@
 #include "Debugging.h"
 #include <stdexcept>
 
+DatabasePtr Database::smpSingletonObj = NULL;
+
 mariadb::connection_ref Database::GetDatabase()
 {
     LOG_DEBUG0("Called.");
-    if (smpDatabase == NULL) {
+    if (smpSingletonObj == NULL) {
         LOG_CRITICAL("Attempted to access database before initialzing.");
         throw std::runtime_error("Database not initialized.");
     }
-    return smpDatabase->mpConnection;
+    return smpSingletonObj->mpConnection;
 }
 
 std::mutex* Database::GetMutex()
 {
     LOG_DEBUG0("Called.");
-    if (smpDatabase == NULL) {
+    if (smpSingletonObj == NULL) {
         LOG_CRITICAL("Attempted to access database before initialzing.");
         throw std::runtime_error("Database not initialized.");
     }
-    return &smpDatabase->mMutex;
+    return &smpSingletonObj->mMutex;
 }
 
 DatabasePtr Database::GetInstance()
 {
     LOG_DEBUG0("Called.");
-    if (smpDatabase == NULL) {
+    if (smpSingletonObj == NULL) {
         LOG_CRITICAL("Attempted to access database before initialzing.");
         throw std::runtime_error("Database not initialized.");
     }
-    return smpDatabase;
+    return smpSingletonObj;
 }
 
 DatabasePtr Database::Initialize(const char* pszServer,
@@ -46,22 +48,22 @@ DatabasePtr Database::Initialize(const char* pszServer,
     const char* pszDatabase)
 {
     LOG_DEBUG0("Called.");
-    if (smpDatabase != NULL) {
+    if (smpSingletonObj != NULL) {
         LOG_CRITICAL("Attempted to initialize the database twice.");
         throw std::runtime_error("Database already initialized.");
     }
     LOG_DEBUG1("Connecting to database.");
-    smpDatabase = new Database(pszServer, wPort, pszUsername, pszPassword, pszDatabase);
+    smpSingletonObj = new Database(pszServer, wPort, pszUsername, pszPassword, pszDatabase);
     LOG_DEBUG1("Successfully connected.");
-    return smpDatabase;
+    return smpSingletonObj;
 }
 
 void Database::Destroy()
 {
     LOG_DEBUG0("Called.");
-    if (smpDatabase != NULL) {
+    if (smpSingletonObj != NULL) {
         LOG_DEBUG1("Disconnecting from database.");
-        delete smpDatabase;
+        delete smpSingletonObj;
     }
 }
 
