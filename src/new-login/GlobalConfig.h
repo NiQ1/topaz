@@ -68,6 +68,12 @@ public:
      */
     static void Destroy();
 
+    /**
+     *  Destructor, closes the config file. Generally calling Destroy
+     *  explicitly is much safer.
+     */
+    ~GlobalConfig();
+
 private:
 
     /**
@@ -80,12 +86,6 @@ private:
      *  Default constructor, read and parse the default configuration
      */
     GlobalConfig();
-
-    /**
-     *  Destructor, closes the config file. Generally calling Destroy
-     *  explicitly is much safer.
-     */
-    ~GlobalConfig();
 
     /**
      *  Trim leading and trailing whitespaces from strings in place.
