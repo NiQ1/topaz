@@ -55,12 +55,6 @@ public:
      */
     void Shutdown(bool bJoin = true);
 
-    /**
-     *  Static wrapper to Run, in order to allow it to run from std::thread
-     *  @param thisobj Needs to point to an already initializaed instance of this class.
-     */
-    static void stRun(LoginHandler* thisobj);
-
 private:
     /// Associated TCP connection
     TCPConnection mConnection;
@@ -70,6 +64,12 @@ private:
     bool mbShutdown;
     /// Associated thread object
     std::shared_ptr<std::thread> mpThreadObj;
+
+    /**
+     *  Static wrapper to Run, in order to allow it to run from std::thread
+     *  @param thisobj Needs to point to an already initializaed instance of this class.
+     */
+    static void stRun(LoginHandler* thisobj);
 };
 
 #endif
