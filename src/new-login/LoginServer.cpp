@@ -143,6 +143,16 @@ void LoginServer::RunServer()
                 mvecWorkingHandlers.push_back(std::shared_ptr<LoginHandler>(pNewHandler));
 			}
 		}
+        // Clean up already finished threads from the vector
+        i = 0;
+        while (i < mvecWorkingHandlers.size()) {
+            if (mvecWorkingHandlers[i]->IsRunning() == false) {
+                mvecWorkingHandlers.erase(mvecWorkingHandlers.begin()+i);
+            }
+            else {
+                i++;
+            }
+        }
 	}
 	mbRunning = false;
 }
