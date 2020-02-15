@@ -31,9 +31,15 @@ public:
     ~LoginHandler();
 
     /**
-     *  Run the handler. Should generally be called from a thread.
+     *  Run the handler. Should generally not be called directly,
+     *  use StartThread() to run the handler in a separate thread.
      */
     void Run();
+
+    /**
+     *  Start running the handler as a separate thread.
+     */
+    void StartThread();
 
     /**
      *  Returns whether the handler is currently running.
@@ -54,13 +60,6 @@ public:
      *  @param thisobj Needs to point to an already initializaed instance of this class.
      */
     static void stRun(LoginHandler* thisobj);
-
-    /**
-     *  Associate a thread object with this handler, allows auto-joining
-     *  the thread on shutdown.
-     *  @param pThreadObj Pointer to the thread to associate
-     */
-    void AttachThreadObject(std::thread* pThreadObj);
 
 private:
     /// Associated TCP connection

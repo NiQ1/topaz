@@ -138,8 +138,7 @@ void LoginServer::RunServer()
 				TCPConnection NewTCPConnection(NewConnection);
                 // Launch login handler for this connection
                 LoginHandler* pNewHandler = new LoginHandler(NewTCPConnection);
-                std::thread* pNewHandlerThread = new std::thread(pNewHandler->stRun, pNewHandler);
-                pNewHandler->AttachThreadObject(pNewHandlerThread);
+                pNewHandler->StartThread();
                 mvecWorkingHandlers.push_back(std::shared_ptr<LoginHandler>(pNewHandler));
 			}
 		}

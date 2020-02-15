@@ -47,6 +47,7 @@ void LoginHandler::Shutdown(bool bJoin)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             if ((bJoin) && (mpThreadObj) && (mpThreadObj->joinable())) {
                 mpThreadObj->join();
+                mpThreadObj = NULL;
             }
         }
         mConnection.Close();
@@ -54,12 +55,17 @@ void LoginHandler::Shutdown(bool bJoin)
     }
 }
 
+void LoginHandler::StartThread()
+{
+    LOG_DEBUG0("Called.");
+    if (mpThreadObj != NULL) {
+        LOG_ERROR("LoginHandler thread already running!");
+        throw std::runtime_error("Thread already running");
+    }
+    mpThreadObj = std::shared_ptr<std::thread>(new std::thread(stRun, this));
+}
+
 void LoginHandler::stRun(LoginHandler* thisobj)
 {
     thisobj->Run();
-}
-
-void LoginHandler::AttachThreadObject(std::thread* pThreadObj)
-{
-    mpThreadObj = std::shared_ptr<std::thread>(pThreadObj);
 }
