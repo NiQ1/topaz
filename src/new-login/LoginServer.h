@@ -9,10 +9,12 @@
 #define FFXI_LOGIN_SERVER_H
 
 #include <vector>
+#include <memory>
 
 #include <stdint.h>
 
 #include "TCPConnection.h"
+#include "LoginHandler.h"
 
 /**
  *	Main login server class.
@@ -54,8 +56,8 @@ public:
 private:
 	/// Current listening sockets
 	std::vector<BoundSocket> mvecListeningSockets;
-	/// Current open connections
-	std::vector<TCPConnection> mvecOpenConnections;
+	/// Currently working handlers
+	std::vector<std::shared_ptr<LoginHandler>> mvecWorkingHandlers;
 	/// Shutdown flag
 	bool mbShutdown;
 	/// Whether server is currently running

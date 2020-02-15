@@ -59,7 +59,7 @@ public:
      *  On sequent calls this argument is ignored.
      *  @param strConfigFileName Name of the configuration file
      */
-    static GlobalConfigPtr GetInstance(std::string strConfigFileName);
+    static GlobalConfigPtr GetInstance(std::string& strConfigFileName);
 
     /**
      *  Destroy and remove the current instance. Allows reloading of
@@ -74,7 +74,7 @@ private:
      *  Read and parse a configuration file.
      *  @param strConfigFileName Name of the configuration file to parse
      */
-    GlobalConfig(std::string strConfigFileName);
+    GlobalConfig(std::string& strConfigFileName);
 
     /**
      *  Default constructor, read and parse the default configuration
@@ -92,6 +92,13 @@ private:
      *  @param str The string to trim
      */
     static void trim(std::string& str);
+
+    /**
+     *  Get a hardcoded default value for the given configuration value.
+     *  @param strConfigName Name of the configuration value to fetch
+     *  @return The configuration value content
+     */
+    std::string GetDefaultValue(std::string& strConfigName);
 
     /// Hashmap containing all configuration string values read to far
     std::unordered_map<std::string, std::string> mmapStringVals;

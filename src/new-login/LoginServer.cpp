@@ -136,7 +136,11 @@ void LoginServer::RunServer()
 				// TODO: Implement SSL here
 				NewConnection.bSecure = false;
 				TCPConnection NewTCPConnection(NewConnection);
-				mvecOpenConnections.push_back(NewConnection);
+                // Launch login handler for this connection
+                LoginHandler* pNewHandler = new LoginHandler(NewTCPConnection);
+                std::thread* pNewHandlerThread = new std::thread(pNewHandler->stRun, pNewHandler);
+                pNewHandler->AttachThreadObject(pNewHandlerThread);
+                mvecWorkingHandlers.push_back(std::shared_ptr<LoginHandler>(pNewHandler));
 			}
 		}
 	}
@@ -153,11 +157,11 @@ void LoginServer::Shutdown()
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
 		LOG_INFO("All running threads stopped.");
-		while (mvecOpenConnections.empty() == false) {
+		while (mvecWorkingHandlers.empty() == false) {
 			// Since the server is no longer running we can assume these
 			// non-atomic operations are safe.
-			mvecOpenConnections.back().Close();
-			mvecOpenConnections.pop_back();
+			mvecWorkingHandlers.back()->Shutdown();
+			mvecWorkingHandlers.pop_back();
 		}
 	}
 	LOG_INFO("Server successfully shut down.");

@@ -18,7 +18,7 @@ GlobalConfig::GlobalConfig()
     }
 }
 
-GlobalConfig::GlobalConfig(std::string strConfigFileName)
+GlobalConfig::GlobalConfig(std::string& strConfigFileName)
 {
     LOG_INFO("Using configuration file: %s", strConfigFileName.c_str());
     mhConfigFile = fopen(strConfigFileName.c_str(), "r");
@@ -80,6 +80,12 @@ std::string GlobalConfig::GetConfigString(std::string& strConfigName)
         }
         linenum++;
     }
+    // Fallback to default value
+    try {
+        return GetDefaultValue(strConfigName);
+    }
+    catch (std::runtime_error&) {
+    }
     LOG_ERROR("Configuration value %s does not exist.", strConfigName);
     throw std::runtime_error("Missing configuration value.");
 }
@@ -126,7 +132,7 @@ GlobalConfigPtr GlobalConfig::GetInstance()
     return smSingletonObj;
 }
 
-GlobalConfigPtr GlobalConfig::GetInstance(std::string strConfigFileName)
+GlobalConfigPtr GlobalConfig::GetInstance(std::string& strConfigFileName)
 {
     if (smSingletonObj == NULL) {
         smSingletonObj = new GlobalConfig(strConfigFileName);
@@ -147,7 +153,7 @@ void GlobalConfig::Destroy()
     smSingletonObj = NULL;
 }
 
-void trim(std::string& str)
+void GlobalConfig::trim(std::string& str)
 {
     size_t pos = 0;
     pos = str.find_first_not_of(' ');
@@ -158,4 +164,26 @@ void trim(std::string& str)
     if (pos != std::string::npos) {
         str.erase(pos + 1);
     }
+}
+
+std::string GlobalConfig::GetDefaultValue(std::string& strConfigName)
+{
+    LOG_DEBUG0("Called.");
+    if (strConfigName == "db_server") {
+        return "127.0.0.1";
+    }
+    else if (strConfigName == "db_port") {
+        return "3306";
+    }
+    else if (strConfigName == "db_database") {
+        return "topaz_login";
+    }
+    else if (strConfigName == "db_username") {
+        return "topaz";
+    }
+    else if (strConfigName == "db_password") {
+        return "topaz";
+    }
+    LOG_ERROR("No default configuration value found.");
+    throw std::runtime_error("Configuration value does not have a hardcoded default");
 }
