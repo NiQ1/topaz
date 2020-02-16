@@ -8,14 +8,25 @@
 #ifndef FFXI_LOGIN_DATABASE_H
 #define FFXI_LOGIN_DATABASE_H
 
-#include <mariadb++/account.hpp>
-#include <mariadb++/connection.hpp>
 #include <stddef.h>
 #include <mutex>
 #include <memory>
 
 class Database;
 typedef Database* DatabasePtr;
+
+// Easy way to lock the DB mutex
+#define LOCK_DB std::lock_guard<std::mutex> l(*Database::GetMutex())
+
+// Hack around a bug in MariaDB++ which causes a compile error on Windows
+// if WinSock2.h is included before its headers.
+namespace mariadb
+{
+    class connection;
+    class account;
+};
+typedef std::shared_ptr<mariadb::connection> DBConnection;
+typedef std::shared_ptr<mariadb::account> DBAccount;
 
 /**
  *  Database access singleton class
@@ -28,7 +39,7 @@ public:
      *  Return the database connection object.
      *  @return Singleton MariaDB++ connection object
      */
-    static mariadb::connection_ref GetDatabase();
+    static DBConnection GetDatabase();
 
     /**
      *  Gets the global database Mutex object. Lock this before
@@ -64,6 +75,14 @@ public:
      */
     void Destroy();
 
+    /**
+     *  Basically same as mysql_real_escape_string but doesn't need
+     *  a connection handle, which MariaDB++ doesn't expose.
+     *  @param strString string to escape
+     *  @return Escaped string
+     */
+    static std::string RealEscapeString(const std::string& strString);
+
 private:
 
     /**
@@ -84,9 +103,9 @@ private:
     static DatabasePtr smpSingletonObj;
 
     /// MariaDB++ connection handle
-    mariadb::connection_ref mpConnection;
+    DBConnection mpConnection;
     /// MariaDB++ account handle
-    mariadb::account_ref mpAccount;
+    DBAccount mpAccount;
     /// Database access mutex
     std::mutex mMutex;
 };

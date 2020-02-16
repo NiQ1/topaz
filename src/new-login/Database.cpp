@@ -8,10 +8,12 @@
 #include "Database.h"
 #include "Debugging.h"
 #include <stdexcept>
+#include <mariadb++/account.hpp>
+#include <mariadb++/connection.hpp>
 
 DatabasePtr Database::smpSingletonObj = NULL;
 
-mariadb::connection_ref Database::GetDatabase()
+DBConnection Database::GetDatabase()
 {
     LOG_DEBUG0("Called.");
     if (smpSingletonObj == NULL) {
@@ -85,4 +87,38 @@ Database::Database(const char* pszServer,
         LOG_CRITICAL("Could not connect to database.");
         throw std::runtime_error("Could not connect to database.");
     }
+}
+
+std::string Database::RealEscapeString(const std::string& strString)
+{
+    LOG_DEBUG0("Called.");
+    size_t cchInput = strString.length();
+    size_t i = 0;
+    const char* pszString = strString.c_str();
+    if (cchInput > 1024) {
+        // Must be some cap here, the input is untrusted and we don't want
+        // to allocate too much memory.
+        LOG_ERROR("String to escape is too long.");
+        throw std::overflow_error("Input size too large.");
+    }
+    char* pszResult = new char[cchInput * 2 + 1];
+    size_t j = 0;
+
+    for (i = 0; i < cchInput; i++) {
+        if ((pszString[i] == '\0') ||
+            (pszString[i] == '\\') ||
+            (pszString[i] == '\n') ||
+            (pszString[i] == '\r') ||
+            (pszString[i] == '\'') ||
+            (pszString[i] == '\"') ||
+            (pszString[i] == 0x1A)) {
+            pszResult[j] = '\\';
+            j++;
+        }
+        pszResult[j] = pszString[i];
+        j++;
+    }
+    pszResult[j] = '\0';
+    delete pszResult;
+    return std::string(pszResult);
 }

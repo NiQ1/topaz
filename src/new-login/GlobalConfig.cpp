@@ -81,7 +81,7 @@ std::string GlobalConfig::GetConfigString(const std::string& strConfigName)
             if (configName == strConfigName) {
                 // Found it, add to cache
                 mmapStringVals[strConfigName] = configVal;
-                LOG_DEBUG1("Value found in file: %s", configVal);
+                LOG_DEBUG1("Value found in file: %s", configVal.c_str());
                 return configVal;
             }
             linenum++;
@@ -200,6 +200,9 @@ std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
     }
     else if (strConfigName == "db_password") {
         return "topaz";
+    }
+    else if (strConfigName == "db_prefix") {
+        return "";
     }
     else if (strConfigName == "login_port") {
         return "54230";
