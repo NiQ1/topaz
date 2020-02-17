@@ -7,6 +7,7 @@
 
 #include "LoginServer.h"
 #include "Debugging.h"
+#include "GlobalConfig.h"
 
 #include <stdexcept>
 #include <thread>
@@ -86,8 +87,11 @@ void LoginServer::Run()
 	int nfds = 0;
 	// Iterator
 	size_t i = 0;
+    size_t j = 0;
 	// Number of listening sockets
 	size_t iNumListeningSocks = 0;
+    // Number of working handlers
+    size_t dwNumWorkingHandlers = 0;
 	// Current socket being iterated
 	SOCKET sockCurrentSocket = 0;
 	// Timeout for select calls
@@ -96,6 +100,12 @@ void LoginServer::Run()
 	int cbsaddrNewConnection = 0;
 	// New bound socket for incoming connections
 	BoundSocket NewConnection = { 0 };
+    // Counter of existing connections of connecting IP
+    uint32_t dwNumConcurrent = 0;
+    // Max number of concurrent connections a single client can have
+    uint32_t dwMaxConcurrent = GlobalConfig::GetInstance()->GetConfigUInt("max_client_connections");
+    // Whether to reject the latest connection
+    bool bReject = false;
 
 	LOG_DEBUG0("Called.");
 	if (mvecListeningSockets.empty()) {
@@ -133,13 +143,31 @@ void LoginServer::Run()
 					continue;
 				}
 				LOG_INFO("Accepted connection from %s", inet_ntoa(NewConnection.BindDetails.sin_addr));
-				// TODO: Implement SSL here
-				NewConnection.bSecure = false;
-				TCPConnection NewTCPConnection(NewConnection);
-                // Launch login handler for this connection
-                LoginHandler* pNewHandler = new LoginHandler(NewTCPConnection);
-                pNewHandler->StartThread();
-                mvecWorkingHandlers.push_back(std::shared_ptr<LoginHandler>(pNewHandler));
+                // TODO: Implement SSL here
+                NewConnection.bSecure = false;
+                TCPConnection NewTCPConnection(NewConnection);
+                // Simple DoS protection - do not allow clients to open too many concurrent connections
+                dwNumConcurrent = 0;
+                dwNumWorkingHandlers = mvecWorkingHandlers.size();
+                bReject = false;
+                for (j = 0; j < dwNumWorkingHandlers; j++) {
+                    if (mvecWorkingHandlers[j]->GetClientDetails().BindDetails.sin_addr.s_addr == NewConnection.BindDetails.sin_addr.s_addr) {
+                        dwNumConcurrent++;
+                        if (dwNumConcurrent >= dwMaxConcurrent) {
+                            LOG_WARNING("Too many concurrent connections from this client, dropping connection.");
+                            bReject = true;
+                        }
+                    }
+                }
+                if (bReject == false) {
+                    // Launch login handler for this connection
+                    LoginHandler* pNewHandler = new LoginHandler(NewTCPConnection);
+                    pNewHandler->StartThread();
+                    mvecWorkingHandlers.push_back(std::shared_ptr<LoginHandler>(pNewHandler));
+                }
+                else {
+                    NewTCPConnection.Close();
+                }
 			}
 		}
         // Clean up already finished threads from the vector

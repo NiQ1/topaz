@@ -35,7 +35,7 @@ uint32_t Authentication::AuthenticateUser(const char* pszUsername, const char* p
             return 0;
         }
         pAccountsFound->next();
-        if (pAccountsFound->get_unsigned32(1) == 0) {
+        if ((pAccountsFound->get_unsigned32(1) & ACCT_PRIV_ENABLED) == 0) {
             mLastError = AUTH_ACCOUNT_DISABLED;
             return 0;
         }

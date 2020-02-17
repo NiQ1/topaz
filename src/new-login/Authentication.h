@@ -38,6 +38,17 @@ public:
     };
 
     /**
+     *  The accout privileges column is a bitmask of these values
+     */
+    enum ACCOUNT_PRIVILEGES
+    {
+        // Account is enabled (without this it cannot log-in at all)
+        ACCT_PRIV_ENABLED = 1,
+        // Account can create characters on test servers
+        ACCT_PRIV_HAS_TEST_ACCESS = 2
+    };
+
+    /**
      *  Authenticate user by username / password.
      *  @param pszUsername Username to authenticate
      *  @param pszPassword Password to authenticate
@@ -61,14 +72,6 @@ public:
      *  @return true if successful, false on failure.
      */
     bool ChangePassword(const char* pszUsername, const char* pszOldPassword, const char* pszNewPassword);
-
-    /**
-     *  Negotiate authentication with the user connected to the given TCP
-     *  connection.
-     *  @param Connection Open TCP connection to the client being authenticated
-     *  @return Account ID of the user on success or 0 on failure
-     */
-    uint32_t Run(TCPConnection& Connection);
 
     /**
      *  Return the value of the last authentication error.

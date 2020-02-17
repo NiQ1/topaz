@@ -92,6 +92,12 @@ public:
 	 */
 	virtual void Close();
 
+    /**
+     *  Gets the bound socket details associated with this connection.
+     *  @return BoundSocket struct associated with the connection.
+     */
+    const BoundSocket& GetConnectionDetails() const;
+
 protected:
 	/// Connection socket and details
 	BoundSocket mConnectionDetails;

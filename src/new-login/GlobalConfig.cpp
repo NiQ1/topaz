@@ -210,6 +210,15 @@ std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
     else if (strConfigName == "login_ip") {
         return "0.0.0.0";
     }
+    else if (strConfigName == "max_login_attempts") {
+        // Max number of login attempts before the client is disconnected
+        return "3";
+    }
+    else if (strConfigName == "max_client_connections") {
+        // Max number of concurrent connections a single client
+        // can have open.
+        return "2";
+    }
     LOG_ERROR("No default configuration value found.");
     throw std::runtime_error("Configuration value does not have a hardcoded default");
 }

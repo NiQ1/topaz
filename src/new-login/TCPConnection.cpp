@@ -142,3 +142,9 @@ void TCPConnection::Close()
 		mbClosed = true;
 	}
 }
+
+const BoundSocket& TCPConnection::GetConnectionDetails() const
+{
+    return mConnectionDetails;
+
+}
