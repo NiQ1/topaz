@@ -16,11 +16,12 @@
 #include "TCPConnection.h"
 #include "ProtocolHandler.h"
 #include "ProtocolFactory.h"
+#include "Thread.h"
 
 /**
  *	Main login server class.
  */
-class LoginServer
+class LoginServer : public Thread
 {
 public:
 
@@ -50,18 +51,6 @@ public:
 	 */
 	void Run();
 
-    /**
-     *  Returns whether the handler is currently running.
-     *  @return True if currently running, false otherwise.
-     */
-    bool IsRunning() const;
-
-    /**
-     *  Start the server in a separate thread. You should generally call this
-     *  instead of run.
-     */
-    void StartThread();
-
 	/**
 	 *	Shut down the server and close all connections and listening sockets.
 	 */
@@ -72,18 +61,6 @@ private:
 	std::vector<BoundSocket> mvecListeningSockets;
 	/// Currently working handlers
 	std::vector<std::shared_ptr<ProtocolHandler>> mvecWorkingHandlers;
-	/// Shutdown flag
-	bool mbShutdown;
-	/// Whether server is currently running
-	bool mbRunning;
-    /// Associated thread object
-    std::shared_ptr<std::thread> mpThreadObj;
-
-    /**
-     *  Static wrapper to Run, in order to allow it to run from std::thread
-     *  @param thisobj Needs to point to an already initializaed instance of this class.
-     */
-    static void stRun(LoginServer* thisobj);
 };
 
 #endif

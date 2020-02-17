@@ -82,6 +82,23 @@ int32_t TCPConnection::ReadAll(uint8_t* bufReceived, int32_t cbMinRead, int32_t 
 	return cbReceived;
 }
 
+bool TCPConnection::CanRead(int32_t iTimeout)
+{
+    fd_set fds;
+    struct timeval tv = { 0 };
+    if (iTimeout > 0) {
+        tv.tv_sec = iTimeout / 1000;
+        tv.tv_usec = (iTimeout % 1000) * 1000;
+    }
+    FD_ZERO(&fds);
+    FD_SET(mConnectionDetails.iSock, &fds);
+    if (select(static_cast<int>(mConnectionDetails.iSock + 1), &fds, NULL, NULL, iTimeout >= 0 ? &tv : NULL) < 0) {
+        LOG_ERROR("Call to select failed.");
+        throw std::runtime_error("Call to select failed.");
+    }
+    return FD_ISSET(mConnectionDetails.iSock, &fds);
+}
+
 int32_t TCPConnection::Write(const uint8_t* bufSend, int32_t cbData)
 {
 	// Bytes written

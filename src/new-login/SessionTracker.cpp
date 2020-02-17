@@ -24,7 +24,8 @@ SessionTrackerPtr SessionTracker::GetInstance()
 
 std::mutex* SessionTracker::GetMutex()
 {
-    LOG_DEBUG0("Called.");
+    // Commented out - Spams the log
+    // LOG_DEBUG0("Called.");
     if (smpSingletonObj == NULL) {
         LOG_CRITICAL("Attempted to access session tracker before initialzing.");
         throw std::runtime_error("Tracker not initialized.");
@@ -86,7 +87,8 @@ void SessionTracker::DeleteSession(uint32_t dwAccountId)
 
 void SessionTracker::DeleteExpiredSessions()
 {
-    LOG_DEBUG0("Called.");
+    // Commented out - Spams the log
+    // LOG_DEBUG0("Called.");
     LOCK_TRACKER;
     time_t tmNow = time(NULL);
 

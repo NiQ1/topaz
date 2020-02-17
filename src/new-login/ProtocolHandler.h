@@ -9,6 +9,7 @@
 #define FFXI_LOGIN_PROTOCOLHANDLER_H
 
 #include "TCPConnection.h"
+#include "Thread.h"
 #include <thread>
 #include <memory>
 
@@ -16,7 +17,7 @@
  *  Abstrace class, derive a class from this for each protocol
  *  implemented by the login server.
  */
-class ProtocolHandler
+class ProtocolHandler : public Thread
 {
 public:
     /**
@@ -38,17 +39,6 @@ public:
     virtual void Run() = 0;
 
     /**
-     *  Start running the handler as a separate thread.
-     */
-    virtual void StartThread();
-
-    /**
-     *  Returns whether the handler is currently running.
-     *  @return True if currently running, false otherwise.
-     */
-    virtual bool IsRunning() const;
-
-    /**
      *  Get the client TCP/IP details
      *  @return BoundSocket struct with the client details.
      */
@@ -65,19 +55,6 @@ public:
 protected:
     /// Associated TCP connection
     std::shared_ptr<TCPConnection> mpConnection;
-    /// Are we currently running
-    bool mbRunning;
-    /// Shutdown flag
-    bool mbShutdown;
-    /// Associated thread object
-    std::shared_ptr<std::thread> mpThreadObj;
-
-    /**
-     *  Static wrapper to Run, in order to allow it to run from std::thread
-     *  @param thisobj Needs to point to an already initializaed instance of this class.
-     */
-    static void stRun(ProtocolHandler* thisobj);
-
 };
 
 #endif

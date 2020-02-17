@@ -53,9 +53,11 @@ int main(int argc, char* argv[])
         Config->GetConfigString("db_database").c_str());
     SessionTracker::GetInstance();
 
-    // Login server handles authentication
     LoginServer LoginServerInstance;
+    // Authentication server
     LoginServerInstance.AddBind(ProtocolFactory::PROTOCOL_AUTH, Config->GetConfigUInt("auth_port"));
+    // Key management and character list server
+    LoginServerInstance.AddBind(ProtocolFactory::PROTOCOL_DATA, Config->GetConfigUInt("data_port"));
     LoginServerInstance.StartThread();
 
     LOG_INFO("Initialization complete, server is running.");

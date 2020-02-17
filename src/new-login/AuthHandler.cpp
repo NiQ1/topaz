@@ -1,6 +1,6 @@
 /**
  *	@file AuthHandler.cpp
- *	Implementation of the login server protocol
+ *	Implementation of the authentication protocol
  *	@author Twilight
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */

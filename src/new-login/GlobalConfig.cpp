@@ -223,6 +223,9 @@ std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
     else if (strConfigName == "auth_port") {
         return "54231";
     }
+    else if (strConfigName == "data_port") {
+        return "54230";
+    }
     else if (strConfigName == "login_ip") {
         return "0.0.0.0";
     }

@@ -10,6 +10,7 @@
 #include "Debugging.h"
 #include "GlobalConfig.h"
 #include "ProtocolFactory.h"
+#include "SessionTracker.h"
 
 #include <stdexcept>
 #include <thread>
@@ -27,7 +28,7 @@
 // Number of allowed pending connections
 #define LISTEN_ALLOWED_BACKLOG 10
 
-LoginServer::LoginServer() : mbShutdown(false), mbRunning(false)
+LoginServer::LoginServer()
 {
 	LOG_DEBUG0("Called.");
 #ifdef _WIN32
@@ -42,7 +43,6 @@ LoginServer::LoginServer() : mbShutdown(false), mbRunning(false)
 LoginServer::~LoginServer()
 {
 	LOG_DEBUG0("Called.");
-	Shutdown();
 #ifdef _WIN32
 	WSACleanup();
 #endif
@@ -107,6 +107,8 @@ void LoginServer::Run()
     uint32_t dwNumConcurrent = 0;
     // Max number of concurrent connections a single client can have
     uint32_t dwMaxConcurrent = GlobalConfig::GetInstance()->GetConfigUInt("max_client_connections");
+    // Session tracker
+    SessionTrackerPtr Sessions = SessionTracker::GetInstance();
     // Whether to reject the latest connection
     bool bReject = false;
 
@@ -129,7 +131,7 @@ void LoginServer::Run()
 				nfds = static_cast<int>(sockCurrentSocket);
 			}
 		}
-		if (select(nfds, &SocketDescriptors, NULL, NULL, &tv) < 0) {
+		if (select(nfds+1, &SocketDescriptors, NULL, NULL, &tv) < 0) {
 			LOG_CRITICAL("select function failed.");
 			throw std::runtime_error("select function failed.");
 		}
@@ -190,23 +192,10 @@ void LoginServer::Run()
                 i++;
             }
         }
+        // Clean up any expired sessions
+        Sessions->DeleteExpiredSessions();
 	}
 	mbRunning = false;
-}
-
-bool LoginServer::IsRunning() const
-{
-    return mbRunning;
-}
-
-void LoginServer::StartThread()
-{
-    LOG_DEBUG0("Called.");
-    if (mpThreadObj != NULL) {
-        LOG_ERROR("LoginServer thread already running!");
-        throw std::runtime_error("Thread already running");
-    }
-    mpThreadObj = std::shared_ptr<std::thread>(new std::thread(stRun, this));
 }
 
 void LoginServer::Shutdown(bool bJoin)
@@ -232,9 +221,4 @@ void LoginServer::Shutdown(bool bJoin)
         }
     }
 	LOG_INFO("Server successfully shut down.");
-}
-
-void LoginServer::stRun(LoginServer* thisobj)
-{
-    thisobj->Run();
 }

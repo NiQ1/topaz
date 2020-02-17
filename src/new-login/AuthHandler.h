@@ -1,12 +1,12 @@
 /**
  *	@file AuthHandler.h
- *	Implementation of the login server protocol
+ *	Implementation of the authentication protocol
  *	@author Twilight
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#ifndef FFXI_LOGIN_AuthHandler_H
-#define FFXI_LOGIN_AuthHandler_H
+#ifndef FFXI_LOGIN_AUTHHANDLER_H
+#define FFXI_LOGIN_AUTHHANDLER_H
 
 #include "ProtocolHandler.h"
 #include "TCPConnection.h"

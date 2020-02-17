@@ -72,6 +72,14 @@ public:
 	 */
 	virtual int32_t ReadAll(uint8_t* bufReceived, int32_t cbMinRead, int32_t cbMaxRead = 0);
 
+    /**
+     *  Checks if there's data available to read. If it returns true if means
+     *  a call to Read will not block (note that a call to ReadAll may still block
+     *  if there's less than cbMinRead bytes to read.
+     *  @param iTimeout Optional parameter specifying time to wait in milliseconds, if omitted, wait forever. Can be zero.
+     */
+    virtual bool CanRead(int32_t iTimeout = -1);
+
 	/**
 	 *	Send data to the connection.
 	 *	@param bufSend The buffer to send
