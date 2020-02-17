@@ -14,7 +14,8 @@
 #include <stdint.h>
 
 #include "TCPConnection.h"
-#include "LoginHandler.h"
+#include "ProtocolHandler.h"
+#include "ProtocolFactory.h"
 
 /**
  *	Main login server class.
@@ -35,12 +36,13 @@ public:
 
 	/**
 	 *	Add a new listening port.
+     *  @param eProtocol The protocol associated with this binding
 	 *	@param wPortNum Port number to listen on
 	 *	@param szIpAddress IP address to listen all (defaults to all interfaces)
 	 *	@param bSecure Set to true for SSL interfaces (if supported)
 	 *	@note This actually starts listening on the port
 	 */
-	void AddBind(uint16_t wPortNum, const char* szIpAddress = NULL, bool bSecure = false);
+	void AddBind(ProtocolFactory::LOGIN_PROTOCOLS eProtocol, uint16_t wPortNum, const char* szIpAddress = NULL, bool bSecure = false);
 
 	/**
 	 *	Run the server and serve connections until Shutdown() is called
@@ -69,7 +71,7 @@ private:
 	/// Current listening sockets
 	std::vector<BoundSocket> mvecListeningSockets;
 	/// Currently working handlers
-	std::vector<std::shared_ptr<LoginHandler>> mvecWorkingHandlers;
+	std::vector<std::shared_ptr<ProtocolHandler>> mvecWorkingHandlers;
 	/// Shutdown flag
 	bool mbShutdown;
 	/// Whether server is currently running

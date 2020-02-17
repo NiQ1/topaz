@@ -9,6 +9,7 @@
 #include "Database.h"
 #include "GlobalConfig.h"
 #include "LoginServer.h"
+#include "ProtocolFactory.h"
 
 #include <signal.h>
 #include <time.h>
@@ -40,7 +41,7 @@ int main(int argc, char* argv[])
 
     // Login server handles authentication
     LoginServer LoginServerInstance;
-    LoginServerInstance.AddBind(Config->GetConfigUInt("login_port"));
+    LoginServerInstance.AddBind(ProtocolFactory::PROTOCOL_AUTH, Config->GetConfigUInt("login_port"));
     LoginServerInstance.StartThread();
 
     LOG_INFO("Initialization complete, server is running.");

@@ -6,8 +6,10 @@
  */
 
 #include "LoginServer.h"
+#include "AuthHandler.h"
 #include "Debugging.h"
 #include "GlobalConfig.h"
+#include "ProtocolFactory.h"
 
 #include <stdexcept>
 #include <thread>
@@ -46,7 +48,7 @@ LoginServer::~LoginServer()
 #endif
 }
 
-void LoginServer::AddBind(uint16_t wPortNum, const char* szIpAddress, bool bSecure)
+void LoginServer::AddBind(ProtocolFactory::LOGIN_PROTOCOLS eProtocol, uint16_t wPortNum, const char* szIpAddress, bool bSecure)
 {
 	struct BoundSocket NewBind = { 0 };
 
@@ -61,6 +63,7 @@ void LoginServer::AddBind(uint16_t wPortNum, const char* szIpAddress, bool bSecu
 	}
 	NewBind.BindDetails.sin_port = htons(wPortNum);
 	NewBind.bSecure = bSecure;
+    NewBind.iAssociatedProtocol = static_cast<int>(eProtocol);
 
 	NewBind.iSock = socket(AF_INET, SOCK_STREAM, 0);
 	if (NewBind.iSock == -1) {
@@ -145,6 +148,7 @@ void LoginServer::Run()
 				LOG_INFO("Accepted connection from %s", inet_ntoa(NewConnection.BindDetails.sin_addr));
                 // TODO: Implement SSL here
                 NewConnection.bSecure = false;
+                NewConnection.iAssociatedProtocol = static_cast<int>(ProtocolFactory::PROTOCOL_STUB);
                 std::shared_ptr<TCPConnection> NewTCPConnection(new TCPConnection(NewConnection));
                 // Simple DoS protection - do not allow clients to open too many concurrent connections
                 dwNumConcurrent = 0;
@@ -161,12 +165,14 @@ void LoginServer::Run()
                 }
                 if (bReject == false) {
                     // Launch login handler for this connection
-                    LoginHandler* pNewHandler = new LoginHandler(NewTCPConnection);
+                    ProtocolHandler* pNewHandler = ProtocolFactory::BuildHandler(
+                        static_cast<ProtocolFactory::LOGIN_PROTOCOLS>(mvecListeningSockets[i].iAssociatedProtocol),
+                        NewTCPConnection);
                     pNewHandler->StartThread();
                     while (pNewHandler->IsRunning() == false) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     }
-                    mvecWorkingHandlers.push_back(std::shared_ptr<LoginHandler>(pNewHandler));
+                    mvecWorkingHandlers.push_back(std::shared_ptr<ProtocolHandler>(pNewHandler));
                 }
                 else {
                     NewTCPConnection->Close();

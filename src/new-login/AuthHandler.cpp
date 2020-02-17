@@ -1,32 +1,29 @@
 /**
- *	@file LoginHandler.cpp
+ *	@file AuthHandler.cpp
  *	Implementation of the login server protocol
  *	@author Twilight
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#include "LoginHandler.h"
+#include "AuthHandler.h"
 #include "Debugging.h"
 #include "Authentication.h"
 #include "GlobalConfig.h"
 #include <thread>
 #include <chrono>
 
-LoginHandler::LoginHandler(std::shared_ptr<TCPConnection> connection) : mpConnection(connection),
-    mbRunning(false),
-    mbShutdown(false),
+AuthHandler::AuthHandler(std::shared_ptr<TCPConnection> connection) : ProtocolHandler(connection),
     mwFailedRequests(0)
 {
     LOG_DEBUG0("Called.");
 }
 
-LoginHandler::~LoginHandler()
+AuthHandler::~AuthHandler()
 {
     LOG_DEBUG0("Called.");
-    Shutdown();
 }
 
-void LoginHandler::Run()
+void AuthHandler::Run()
 {
     // Contains the latest received login request
     LoginPacket LoginRequest = { 0 };
@@ -134,12 +131,12 @@ void LoginHandler::Run()
         iReceivedBytes = mpConnection->ReadAll(reinterpret_cast<uint8_t*>(&LoginRequest), 33, sizeof(LoginRequest));
     }
 
-    LOG_DEBUG0("LoginHandler ended.");
+    LOG_DEBUG0("AuthHandler ended.");
     mbRunning = false;
     mpConnection->Close();
 }
 
-bool LoginHandler::VerifyNullTerminatedString(const char* pszString, size_t dwMaxSize)
+bool AuthHandler::VerifyNullTerminatedString(const char* pszString, size_t dwMaxSize)
 {
     size_t i = 0;
     for (i = 0; i < dwMaxSize; i++) {
@@ -153,7 +150,7 @@ bool LoginHandler::VerifyNullTerminatedString(const char* pszString, size_t dwMa
     return true;
 }
 
-bool LoginHandler::VerifyPacket(LoginPacket& Packet)
+bool AuthHandler::VerifyPacket(LoginPacket& Packet)
 {
 
     if ((Packet.ucCommandType != LOGIN_COMMAND_LOGIN) &&
@@ -182,46 +179,4 @@ bool LoginHandler::VerifyPacket(LoginPacket& Packet)
     return true;
 }
 
-bool LoginHandler::IsRunning() const
-{
-    return mbRunning;
-}
 
-void LoginHandler::Shutdown(bool bJoin)
-{
-    LOG_DEBUG0("Called.");
-    if (mbShutdown == false) {
-        LOG_DEBUG1("Shutting down handler.");
-        mbShutdown = true;
-        while (mbRunning) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-        if ((bJoin) && (mpThreadObj) && (mpThreadObj->joinable())) {
-            mpThreadObj->join();
-            mpThreadObj = NULL;
-            LOG_DEBUG0("Thread joined.");
-        }
-        mpConnection->Close();
-        LOG_DEBUG1("Handler ended successfully.");
-    }
-}
-
-void LoginHandler::StartThread()
-{
-    LOG_DEBUG0("Called.");
-    if (mpThreadObj != NULL) {
-        LOG_ERROR("LoginHandler thread already running!");
-        throw std::runtime_error("Thread already running");
-    }
-    mpThreadObj = std::shared_ptr<std::thread>(new std::thread(stRun, this));
-}
-
-void LoginHandler::stRun(LoginHandler* thisobj)
-{
-    thisobj->Run();
-}
-
-const BoundSocket& LoginHandler::GetClientDetails() const
-{
-    return mpConnection->GetConnectionDetails();
-}

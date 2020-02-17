@@ -32,8 +32,10 @@ struct BoundSocket
 	SOCKET iSock;
 	/// Bind details
 	struct sockaddr_in BindDetails;
-	/// SSL flag
+	/// SSL flag, listening sockets only
 	bool bSecure;
+    /// Associated protocol, listening sockets only
+    int iAssociatedProtocol;
 };
 
 class TCPConnection
