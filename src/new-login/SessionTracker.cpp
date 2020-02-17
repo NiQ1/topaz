@@ -92,10 +92,14 @@ void SessionTracker::DeleteExpiredSessions()
     LOCK_TRACKER;
     time_t tmNow = time(NULL);
 
-    auto i = mmapSessions.begin(); 
+    auto i = mmapSessions.begin();
+    auto j = i;
     while (i != mmapSessions.end()) {
         if (i->second.tmExpires <= tmNow) {
+            j = i;
+            j++;
             mmapSessions.erase(i->first);
+            i = j;
         }
         else {
             i++;

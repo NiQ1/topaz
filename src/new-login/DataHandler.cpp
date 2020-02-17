@@ -5,10 +5,16 @@
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
+#include <mariadb++/connection.hpp>
 #include "DataHandler.h"
 #include "Debugging.h"
+#include "Database.h"
 #include "SessionTracker.h"
+#include "Utilities.h"
+#include "GlobalConfig.h"
 #include <time.h>
+#include <stdexcept>
+#include <memory>
 
 DataHandler::DataHandler(std::shared_ptr<TCPConnection> connection) : ProtocolHandler(connection), mdwAccountID(0)
 {
@@ -140,9 +146,74 @@ void DataHandler::Run()
         }
         else {
             LOG_DEBUG1("Sending character list to client.");
-            // TODO: Send character data
+            SendCharacterList();
         }
     }
     LOG_INFO("Client successfully connected with account ID: %d", mdwAccountID);
     mpConnection->Close();
+    mbRunning = false;
+}
+
+void DataHandler::SendCharacterList()
+{
+    LOG_DEBUG0("Called.");
+    DBConnection DB = Database::GetDatabase();
+    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+
+    // The size of the packet is determined by the number of characters
+    // the user is allowed to create, which is the content_ids column
+    // in the accounts table.
+    std::string strSqlQueryFmt("SELECT content_ids FROM %saccounts WHERE id=%d;");
+    std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
+        Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+        mdwAccountID));
+    mariadb::result_set_ref pResultSet = DB->query(strSqlFinalQuery);
+    if (pResultSet->row_count() == 0) {
+        LOG_ERROR("Failed to query the number of content IDs.");
+        throw std::runtime_error("content_ids query failed.");
+    }
+    pResultSet->next();
+    uint8_t cContentIds = pResultSet->get_unsigned8(0);
+    // So now we know the size of the packet we're sending
+    CHARACTER_ENTRY* pCharList = new CHARACTER_ENTRY[cContentIds];
+    try {
+        memset(pCharList, 0, sizeof(CHARACTER_ENTRY) * cContentIds);
+        strSqlQueryFmt = "SELECT id FROM %schars WHERE account_id=%d;";
+        strSqlFinalQuery = FormatString(&strSqlQueryFmt,
+            Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+            mdwAccountID);
+        pResultSet = DB->query(strSqlFinalQuery);
+        if (pResultSet->row_count() == 0) {
+            LOG_ERROR("Failed to query the list of characters.");
+            throw std::runtime_error("char ids query failed.");
+        }
+        uint8_t cNumchars = 0;
+        uint32_t dwCurrentChar = 0;
+        while (pResultSet->next()) {
+            dwCurrentChar = pResultSet->get_unsigned32(0);
+            pCharList[cNumchars].dwContentID = dwCurrentChar;
+            pCharList[cNumchars].dwCharacterID = dwCurrentChar;
+            cNumchars++;
+            if (cNumchars >= cContentIds) {
+                // Safeguard just in case the DB has more chars than allowed
+                break;
+            }
+        }
+        // The header is the packet type and number of chars, and it actually
+        // overwrites the first two bytes, but since they're guaranteed to be
+        // zero anyway, that's fine.
+        reinterpret_cast<uint8_t*>(pCharList)[0] = static_cast<uint8_t>(S2C_PACKET_CHARACTER_LIST);
+        reinterpret_cast<uint8_t*>(pCharList)[1] = cNumchars;
+        LOG_DEBUG1("Sending character list.");
+        if (mpConnection->WriteAll(reinterpret_cast<uint8_t*>(pCharList), sizeof(CHARACTER_ENTRY) * cContentIds) <= 0) {
+            LOG_ERROR("Connection error when sending character ID list.");
+            throw std::runtime_error("Connection dropped.");
+        }
+        LOG_DEBUG1("Character list send.");
+    }
+    catch (...) {
+        delete pCharList;
+        throw;
+    }
+    delete pCharList;
 }

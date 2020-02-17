@@ -73,7 +73,23 @@ private:
         uint32_t dwAccountID;
         uint32_t dwServerAddress;
     };
+
+    /**
+     *  A single entry in the character list sent to the client
+     */
+    struct CHARACTER_ENTRY
+    {
+        // Always zero, doesn't seem to have any meaning
+        uint8_t ucZero[16];
+        uint32_t dwContentID;
+        uint32_t dwCharacterID;
+    };
 #pragma pack(pop)
+
+    /**
+     *  Send the character list packet to the client
+     */
+    void SendCharacterList();
 
 };
 
