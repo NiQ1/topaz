@@ -119,6 +119,7 @@ std::string Database::RealEscapeString(const std::string& strString)
         j++;
     }
     pszResult[j] = '\0';
+    std::string strResult(pszResult);
     delete pszResult;
-    return std::string(pszResult);
+    return strResult;
 }

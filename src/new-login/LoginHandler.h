@@ -22,7 +22,7 @@ public:
      *  Create a new handler.
      *  @param connection TCP connection to assign to this handler
      */
-    LoginHandler(TCPConnection& connection);
+    LoginHandler(std::shared_ptr<TCPConnection> connection);
 
     /**
      *  Generally it's advisable to explicitly call Shutdown before
@@ -63,7 +63,7 @@ public:
 
 private:
     /// Associated TCP connection
-    TCPConnection mConnection;
+    std::shared_ptr<TCPConnection> mpConnection;
     /// Are we currently running
     bool mbRunning;
     /// Shutdown flag

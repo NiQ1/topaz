@@ -10,25 +10,29 @@
 #include "Database.h"
 #include "GlobalConfig.h"
 #include "Utilities.h"
+#include "Debugging.h"
 #include <mutex>
 #include <time.h>
 
 Authentication::Authentication() : mLastError(AUTH_SUCCESS)
 {
+    LOG_DEBUG0("Called.");
 }
 
 uint32_t Authentication::AuthenticateUser(const char* pszUsername, const char* pszPassword)
 {
+    LOG_DEBUG0("Called.");
     try {
         LOCK_DB;
         DBConnection DB = Database::GetDatabase();
         GlobalConfigPtr Config = GlobalConfig::GetInstance();
 
-        std::string strSqlQueryFmt("SELECT id, privileges FROM %saccouts WHERE username='%s' AND password=SHA2(CONCAT('%s', salt), 256)");
-        mariadb::result_set_ref pAccountsFound = DB->query(FormatString(&strSqlQueryFmt,
-            Database::RealEscapeString(Config->GetConfigString("db_prefix")),
-            Database::RealEscapeString(pszUsername),
-            Database::RealEscapeString(pszPassword)));
+        std::string strSqlQueryFmt("SELECT id, privileges FROM %saccounts WHERE username='%s' AND password=SHA2(CONCAT('%s', salt), 256)");
+        std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
+            Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+            Database::RealEscapeString(pszUsername).c_str(),
+            Database::RealEscapeString(pszPassword).c_str()));
+        mariadb::result_set_ref pAccountsFound = DB->query(strSqlFinalQuery);
         if (pAccountsFound->row_count() == 0) {
             // Nothing found == unauthenticated (doesn't matter whether user doesn't exist or wrong password)
             mLastError = AUTH_NO_USER_OR_BAD_PASSWORD;
@@ -40,26 +44,29 @@ uint32_t Authentication::AuthenticateUser(const char* pszUsername, const char* p
             return 0;
         }
         mLastError = AUTH_SUCCESS;
-        pAccountsFound->get_unsigned32(0);
+        return pAccountsFound->get_unsigned32(0);
     }
     catch(...) {
+        LOG_ERROR("Exception thrown on DB access.");
     }
     mLastError = AUTH_INTERNAL_FAILURE;
     return 0;
 }
 
-uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPassword)
+uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPassword, const char* pszEmail)
 {
+    LOG_DEBUG0("Called.");
     try {
         LOCK_DB;
         DBConnection DB = Database::GetDatabase();
         GlobalConfigPtr Config = GlobalConfig::GetInstance();
 
         // First make sure username is unique
-        std::string strSqlQueryFmt("SELECT id FROM %saccouts WHERE username='%s';");
-        mariadb::result_set_ref pAccountsFound = DB->query(FormatString(&strSqlQueryFmt,
-            Database::RealEscapeString(Config->GetConfigString("db_prefix")),
-            Database::RealEscapeString(pszUsername)));
+        std::string strSqlQueryFmt("SELECT id FROM %saccounts WHERE username='%s';");
+        std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
+            Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+            Database::RealEscapeString(pszUsername).c_str()));
+        mariadb::result_set_ref pAccountsFound = DB->query(strSqlFinalQuery);
         if (pAccountsFound->row_count() != 0) {
             // User name already taken
             mLastError = AUTH_USERNAME_TAKEN;
@@ -73,21 +80,35 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         // Random salt automatically added so two identical passwords won't have the same hash
         std::string strSalt(GenerateSalt());
         // Showtime
-        strSqlQueryFmt = "INSERT INTO %saccounts (username, password, salt) VALUES (%s, %s, %s)";
-        if (DB->insert(FormatString(&strSqlQueryFmt,
-            Database::RealEscapeString(Config->GetConfigString("db_prefix")),
-            Database::RealEscapeString(pszUsername),
-            Database::RealEscapeString(pszPassword),
-            Database::RealEscapeString(strSalt))) == 0) {
+        if (pszEmail) {
+            strSqlQueryFmt = "INSERT INTO %saccounts (username, password, salt, email) VALUES ('%s', SHA2(CONCAT('%s', '%s'), 256), '%s', '%s')";
+            strSqlFinalQuery = FormatString(&strSqlQueryFmt,
+                Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+                Database::RealEscapeString(pszUsername).c_str(),
+                Database::RealEscapeString(pszPassword).c_str(),
+                Database::RealEscapeString(strSalt).c_str(),
+                Database::RealEscapeString(strSalt).c_str(),
+                Database::RealEscapeString(pszEmail).c_str());
+        }
+        else {
+            strSqlQueryFmt = "INSERT INTO %saccounts (username, password, salt) VALUES ('%s', SHA2(CONCAT('%s', '%s'), 256), '%s')";
+            strSqlFinalQuery = FormatString(&strSqlQueryFmt,
+                Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+                Database::RealEscapeString(pszUsername).c_str(),
+                Database::RealEscapeString(pszPassword).c_str(),
+                Database::RealEscapeString(strSalt).c_str(),
+                Database::RealEscapeString(strSalt).c_str());
+            }
+        if (DB->insert(strSqlFinalQuery) == 0) {
             // Failed
             mLastError = mLastError = AUTH_INTERNAL_FAILURE;
             return 0;
         }
         // Now pull the id of the user we've just created
-        strSqlQueryFmt = "SELECT id FROM %saccouts WHERE username='%s';";
+        strSqlQueryFmt = "SELECT id FROM %saccounts WHERE username='%s';";
         pAccountsFound = DB->query(FormatString(&strSqlQueryFmt,
-            Database::RealEscapeString(Config->GetConfigString("db_prefix")),
-            Database::RealEscapeString(pszUsername)));
+            Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+            Database::RealEscapeString(pszUsername).c_str()));
         if (pAccountsFound->row_count() == 0) {
             // Shouldn't happen
             mLastError = AUTH_INTERNAL_FAILURE;
@@ -98,6 +119,7 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         return pAccountsFound->get_unsigned32(0);
     }
     catch (...) {
+        LOG_ERROR("Exception thrown on DB access.");
         mLastError = AUTH_INTERNAL_FAILURE;
         return 0;
     }
@@ -105,6 +127,7 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
 
 bool Authentication::ChangePassword(const char* pszUsername, const char* pszOldPassword, const char* pszNewPassword)
 {
+    LOG_DEBUG0("Called.");
     try {
         LOCK_DB;
         DBConnection DB = Database::GetDatabase();
@@ -121,12 +144,12 @@ bool Authentication::ChangePassword(const char* pszUsername, const char* pszOldP
             return false;
         }
         std::string strSalt(GenerateSalt());
-        std::string strSqlQueryFmt("UPDATE %saccouts SET password=SHA2(CONCAT('%s', '%s'), 256), salt='%s' WHERE id=%d;");
+        std::string strSqlQueryFmt("UPDATE %saccounts SET password=SHA2(CONCAT('%s', '%s'), 256), salt='%s' WHERE id=%d;");
         if (DB->execute(FormatString(&strSqlQueryFmt,
-            Database::RealEscapeString(Config->GetConfigString("db_prefix")),
-            Database::RealEscapeString(pszNewPassword),
-            Database::RealEscapeString(strSalt),
-            Database::RealEscapeString(strSalt),
+            Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+            Database::RealEscapeString(pszNewPassword).c_str(),
+            Database::RealEscapeString(strSalt).c_str(),
+            Database::RealEscapeString(strSalt).c_str(),
             dwUserUID)) == 0) {
             mLastError = AUTH_INTERNAL_FAILURE;
             return false;
@@ -135,6 +158,7 @@ bool Authentication::ChangePassword(const char* pszUsername, const char* pszOldP
         return true;
     }
     catch (...) {
+        LOG_ERROR("Exception thrown on DB access.");
         mLastError = AUTH_INTERNAL_FAILURE;
         return false;
     }
@@ -147,6 +171,7 @@ Authentication::AUTHENTICATION_ERROR Authentication::GetLastAuthenticationError(
 
 std::string Authentication::GenerateSalt()
 {
+    LOG_DEBUG0("Called.");
     char szRandomChars[11];
     for (int i = 0; i < sizeof(szRandomChars) - 1; i++) {
         // Generate 10 printable characters (range 33-126)
@@ -158,6 +183,7 @@ std::string Authentication::GenerateSalt()
 
 bool Authentication::CheckPasswordComplexity(const char* pszPassword)
 {
+    LOG_DEBUG0("Called.");
     size_t sPassLen = strlen(pszPassword);
     if (sPassLen < 8) {
         return false;

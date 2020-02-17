@@ -75,7 +75,7 @@ void LoginServer::AddBind(uint16_t wPortNum, const char* szIpAddress, bool bSecu
 		LOG_ERROR("listen function failed.");
 		throw std::runtime_error("listen function failed.");
 	}
-	LOG_INFO("Attached to %s:%d", inet_ntoa(NewBind.BindDetails.sin_addr), NewBind.BindDetails.sin_port);
+	LOG_INFO("Attached to %s:%d", inet_ntoa(NewBind.BindDetails.sin_addr), wPortNum);
 	mvecListeningSockets.push_back(NewBind);
 }
 
@@ -145,7 +145,7 @@ void LoginServer::Run()
 				LOG_INFO("Accepted connection from %s", inet_ntoa(NewConnection.BindDetails.sin_addr));
                 // TODO: Implement SSL here
                 NewConnection.bSecure = false;
-                TCPConnection NewTCPConnection(NewConnection);
+                std::shared_ptr<TCPConnection> NewTCPConnection(new TCPConnection(NewConnection));
                 // Simple DoS protection - do not allow clients to open too many concurrent connections
                 dwNumConcurrent = 0;
                 dwNumWorkingHandlers = mvecWorkingHandlers.size();
@@ -163,10 +163,13 @@ void LoginServer::Run()
                     // Launch login handler for this connection
                     LoginHandler* pNewHandler = new LoginHandler(NewTCPConnection);
                     pNewHandler->StartThread();
+                    while (pNewHandler->IsRunning() == false) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    }
                     mvecWorkingHandlers.push_back(std::shared_ptr<LoginHandler>(pNewHandler));
                 }
                 else {
-                    NewTCPConnection.Close();
+                    NewTCPConnection->Close();
                 }
 			}
 		}
@@ -174,6 +177,7 @@ void LoginServer::Run()
         i = 0;
         while (i < mvecWorkingHandlers.size()) {
             if (mvecWorkingHandlers[i]->IsRunning() == false) {
+                mvecWorkingHandlers[i]->Shutdown();
                 mvecWorkingHandlers.erase(mvecWorkingHandlers.begin()+i);
             }
             else {

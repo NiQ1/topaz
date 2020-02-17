@@ -12,7 +12,7 @@
 #include <thread>
 #include <chrono>
 
-LoginHandler::LoginHandler(TCPConnection& connection) : mConnection(connection),
+LoginHandler::LoginHandler(std::shared_ptr<TCPConnection> connection) : mpConnection(connection),
     mbRunning(false),
     mbShutdown(false),
     mwFailedRequests(0)
@@ -48,7 +48,7 @@ void LoginHandler::Run()
 
     // Read a minimum of 33 bytes, which is what the stock xiloader sents
     // up to the size of the struct because some modified bootloaders send more data.
-    iReceivedBytes = mConnection.ReadAll(reinterpret_cast<uint8_t*>(&LoginRequest), 33, sizeof(LoginRequest));
+    iReceivedBytes = mpConnection->ReadAll(reinterpret_cast<uint8_t*>(&LoginRequest), 33, sizeof(LoginRequest));
     while ((iReceivedBytes > 0) && (mbShutdown == false)) {
         LOG_DEBUG0("Packet received.");
         memset(&LoginResponse, 0, sizeof(LoginResponse));
@@ -78,7 +78,9 @@ void LoginHandler::Run()
             break;
         case LOGIN_COMMAND_CREATE:
             LOG_DEBUG1("Received account creation packet, username=%s", LoginRequest.szUserName);
-            dwAccountId = Authenticator.CreateUser(LoginRequest.szUserName, LoginRequest.szPassword);
+            dwAccountId = Authenticator.CreateUser(LoginRequest.szUserName,
+                LoginRequest.szPassword,
+                LoginRequest.szEmail[0] != '\0' ? LoginRequest.szEmail : NULL);
             if (dwAccountId) {
                 // Creation successful
                 LOG_INFO("User %s successfully created.", LoginRequest.szUserName);
@@ -116,7 +118,7 @@ void LoginHandler::Run()
             mwFailedRequests++;
         }
         // Send the response packet
-        mConnection.WriteAll(reinterpret_cast<uint8_t*>(&LoginResponse), sizeof(LoginResponse));
+        mpConnection->WriteAll(reinterpret_cast<uint8_t*>(&LoginResponse), sizeof(LoginResponse));
         if ((dwMaxLoginAttempts > 0) && (mwFailedRequests > dwMaxLoginAttempts)) {
             // Too many failed login attempts
             LOG_WARNING("Too many failed login attempts, disconnecting client.");
@@ -129,11 +131,12 @@ void LoginHandler::Run()
         }
         // Read next packet
         memset(&LoginRequest, 0, sizeof(LoginRequest));
-        iReceivedBytes = mConnection.ReadAll(reinterpret_cast<uint8_t*>(&LoginRequest), 33, sizeof(LoginRequest));
+        iReceivedBytes = mpConnection->ReadAll(reinterpret_cast<uint8_t*>(&LoginRequest), 33, sizeof(LoginRequest));
     }
 
     LOG_DEBUG0("LoginHandler ended.");
     mbRunning = false;
+    mpConnection->Close();
 }
 
 bool LoginHandler::VerifyNullTerminatedString(const char* pszString, size_t dwMaxSize)
@@ -167,6 +170,10 @@ bool LoginHandler::VerifyPacket(LoginPacket& Packet)
     if (!VerifyNullTerminatedString(Packet.szPassword, sizeof(Packet.szPassword))) {
         return false;
     }
+    // Email is optional but if given needs to be valid too
+    if ((Packet.szEmail[0] != '\0') && (!VerifyNullTerminatedString(Packet.szEmail, sizeof(Packet.szEmail)))) {
+        return false;
+    }
     // Change password must have a new password field as well
     if ((Packet.ucCommandType == LOGIN_COMMAND_CHANGE_PASSWORD) &&
         (!VerifyNullTerminatedString(Packet.szNewPassword, sizeof(Packet.szNewPassword)))) {
@@ -188,13 +195,13 @@ void LoginHandler::Shutdown(bool bJoin)
         mbShutdown = true;
         while (mbRunning) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            if ((bJoin) && (mpThreadObj) && (mpThreadObj->joinable())) {
-                mpThreadObj->join();
-                mpThreadObj = NULL;
-                LOG_DEBUG0("Thread joined.");
-            }
         }
-        mConnection.Close();
+        if ((bJoin) && (mpThreadObj) && (mpThreadObj->joinable())) {
+            mpThreadObj->join();
+            mpThreadObj = NULL;
+            LOG_DEBUG0("Thread joined.");
+        }
+        mpConnection->Close();
         LOG_DEBUG1("Handler ended successfully.");
     }
 }
@@ -216,5 +223,5 @@ void LoginHandler::stRun(LoginHandler* thisobj)
 
 const BoundSocket& LoginHandler::GetClientDetails() const
 {
-    return mConnection.GetConnectionDetails();
+    return mpConnection->GetConnectionDetails();
 }

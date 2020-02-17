@@ -46,7 +46,7 @@ std::string GlobalConfig::GetConfigString(const std::string& strConfigName)
     auto strVal = mmapStringVals.find(strConfigName);
     if (strVal != mmapStringVals.end()) {
         LOG_DEBUG1("Value found in cache: %s", strVal->first);
-        return strVal->first;
+        return strVal->second;
     }
     if (mhConfigFile) {
         LOG_DEBUG0("Value not in cache, searching file.");
@@ -173,11 +173,11 @@ void GlobalConfig::Destroy()
 void GlobalConfig::trim(std::string& str)
 {
     size_t pos = 0;
-    pos = str.find_first_not_of(' ');
+    pos = str.find_first_not_of(" \r\n");
     if (pos != std::string::npos) {
         str.erase(0, pos);
     }
-    pos = str.find_last_not_of(' ');
+    pos = str.find_last_not_of(" \r\n");
     if (pos != std::string::npos) {
         str.erase(pos + 1);
     }
@@ -205,7 +205,7 @@ std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
         return "";
     }
     else if (strConfigName == "login_port") {
-        return "54230";
+        return "54231";
     }
     else if (strConfigName == "login_ip") {
         return "0.0.0.0";
