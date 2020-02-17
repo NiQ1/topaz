@@ -83,6 +83,11 @@ public:
      */
     static std::string RealEscapeString(const std::string& strString);
 
+    /**
+     *  Destructor. It is preferrable to call destroy explicitly.
+     */
+    ~Database();
+
 private:
 
     /**
@@ -101,6 +106,8 @@ private:
 
     /// Static database singleton pointer
     static DatabasePtr smpSingletonObj;
+    /// Object is being destroyed
+    static bool sbBeingDestroyed;
 
     /// MariaDB++ connection handle
     DBConnection mpConnection;

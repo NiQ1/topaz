@@ -34,7 +34,7 @@ void AuthHandler::Run()
     // Response packet to send back to the client
     LoginResponsePacket LoginResponse = { 0 };
     // Authenticator object
-    Authentication Authenticator;
+    Authentication Authenticator(mpConnection);
     // Whether authentication has succeeded
     bool bSuccess = false;
     // Number of allowed login attempts before the user is disconnected

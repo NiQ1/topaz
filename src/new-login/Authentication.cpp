@@ -11,10 +11,11 @@
 #include "GlobalConfig.h"
 #include "Utilities.h"
 #include "Debugging.h"
+#include "SessionTracker.h"
 #include <mutex>
 #include <time.h>
 
-Authentication::Authentication() : mLastError(AUTH_SUCCESS)
+Authentication::Authentication(std::shared_ptr<TCPConnection> Connection) : mLastError(AUTH_SUCCESS), mpConnection(Connection)
 {
     LOG_DEBUG0("Called.");
 }
@@ -44,7 +45,14 @@ uint32_t Authentication::AuthenticateUser(const char* pszUsername, const char* p
             return 0;
         }
         mLastError = AUTH_SUCCESS;
-        return pAccountsFound->get_unsigned32(0);
+        uint32_t dwAccountId = pAccountsFound->get_unsigned32(0);
+        // Add this account to the session tracker, which will allow the client
+        // to connect to the data server.
+        SessionTracker::GetInstance()->SetSessionDetails({ dwAccountId,
+            mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr,
+            {0},
+            time(NULL)+GlobalConfig::GetInstance()->GetConfigUInt("session_timeout") });
+        return dwAccountId;
     }
     catch(...) {
         LOG_ERROR("Exception thrown on DB access.");
@@ -116,7 +124,14 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         }
         pAccountsFound->next();
         mLastError = AUTH_SUCCESS;
-        return pAccountsFound->get_unsigned32(0);
+        uint32_t dwAccountId = pAccountsFound->get_unsigned32(0);
+        // Add this account to the session tracker, which will allow the client
+        // to connect to the data server.
+        SessionTracker::GetInstance()->SetSessionDetails({ dwAccountId,
+            mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr,
+            {0},
+            time(NULL) + GlobalConfig::GetInstance()->GetConfigUInt("session_timeout") });
+        return dwAccountId;
     }
     catch (...) {
         LOG_ERROR("Exception thrown on DB access.");

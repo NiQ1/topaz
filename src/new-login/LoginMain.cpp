@@ -10,6 +10,7 @@
 #include "GlobalConfig.h"
 #include "LoginServer.h"
 #include "ProtocolFactory.h"
+#include "SessionTracker.h"
 
 #include <signal.h>
 #include <time.h>
@@ -17,11 +18,22 @@
 #include <chrono>
 #include <string>
 
+#ifdef _WIN32
+#include <io.h>
+#define close _close
+#define fileno _fileno
+#else
+#include <unistd.h>
+#endif
+
 bool gbExitFlag = false;
 
 void LoginSignalHandler(int signal)
 {
     gbExitFlag = true;
+    // If we do a UI then the main thread is likely to be blocked reading
+    // from the keyboard. Close stdin so the signal can be processed.
+    close(fileno(stdin));
 }
 
 int main(int argc, char* argv[])
@@ -30,6 +42,7 @@ int main(int argc, char* argv[])
     signal(SIGTERM, LoginSignalHandler);
     signal(SIGINT, LoginSignalHandler);
     srand(static_cast<unsigned int>(time(NULL)));
+
     // Load global configuration
     GlobalConfigPtr Config = GlobalConfig::GetInstance();
     // Connect to database
@@ -38,10 +51,11 @@ int main(int argc, char* argv[])
         Config->GetConfigString("db_username").c_str(),
         Config->GetConfigString("db_password").c_str(),
         Config->GetConfigString("db_database").c_str());
+    SessionTracker::GetInstance();
 
     // Login server handles authentication
     LoginServer LoginServerInstance;
-    LoginServerInstance.AddBind(ProtocolFactory::PROTOCOL_AUTH, Config->GetConfigUInt("login_port"));
+    LoginServerInstance.AddBind(ProtocolFactory::PROTOCOL_AUTH, Config->GetConfigUInt("auth_port"));
     LoginServerInstance.StartThread();
 
     LOG_INFO("Initialization complete, server is running.");
@@ -54,6 +68,9 @@ int main(int argc, char* argv[])
     LOG_INFO("Shutting down server.");
 
     LoginServerInstance.Shutdown();
+    SessionTracker::GetInstance()->Destroy();
+    DB->Destroy();
+    Config->Destroy();
 
     LOG_INFO("Shutdown complete.");
 }

@@ -12,6 +12,7 @@
 #include <mariadb++/connection.hpp>
 
 DatabasePtr Database::smpSingletonObj = NULL;
+bool Database::sbBeingDestroyed = false;
 
 DBConnection Database::GetDatabase()
 {
@@ -63,6 +64,7 @@ DatabasePtr Database::Initialize(const char* pszServer,
 void Database::Destroy()
 {
     LOG_DEBUG0("Called.");
+    sbBeingDestroyed = true;
     if (smpSingletonObj != NULL) {
         LOG_DEBUG1("Disconnecting from database.");
         delete smpSingletonObj;
@@ -86,6 +88,13 @@ Database::Database(const char* pszServer,
     if (mpConnection == NULL) {
         LOG_CRITICAL("Could not connect to database.");
         throw std::runtime_error("Could not connect to database.");
+    }
+}
+
+Database::~Database()
+{
+    if (sbBeingDestroyed == false) {
+        Destroy();
     }
 }
 

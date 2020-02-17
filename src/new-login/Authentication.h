@@ -21,7 +21,7 @@ public:
     /**
      *  Initialize the authenticator.
      */
-    Authentication();
+    Authentication(std::shared_ptr<TCPConnection>);
 
     /**
      *  Possible errors returned by the authentication process
@@ -84,6 +84,8 @@ private:
 
     /// Last authentication error that occured
     AUTHENTICATION_ERROR mLastError;
+    /// Connecting client
+    std::shared_ptr<TCPConnection> mpConnection;
 
     /**
      *  Generate a unique string to be used as password salt.

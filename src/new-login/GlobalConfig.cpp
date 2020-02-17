@@ -9,6 +9,7 @@
 #include "Debugging.h"
 
 GlobalConfigPtr GlobalConfig::smpSingletonObj = NULL;
+bool GlobalConfig::sbBeingDestroyed = false;
 
 GlobalConfig::GlobalConfig()
 {
@@ -30,7 +31,9 @@ GlobalConfig::GlobalConfig(std::string& strConfigFileName)
 
 GlobalConfig::~GlobalConfig()
 {
-    Destroy();
+    if (sbBeingDestroyed == false) {
+        Destroy();
+    }
 }
 
 std::string GlobalConfig::GetConfigString(const char* pszConfigName)
@@ -41,6 +44,7 @@ std::string GlobalConfig::GetConfigString(const char* pszConfigName)
 std::string GlobalConfig::GetConfigString(const std::string& strConfigName)
 {
     LOG_DEBUG0("Called.");
+    LOCK_CONFIG;
     // May already be cached
     LOG_DEBUG1("Searching configuration for: %s", strConfigName.c_str());
     auto strVal = mmapStringVals.find(strConfigName);
@@ -157,8 +161,20 @@ GlobalConfigPtr GlobalConfig::GetInstance(std::string& strConfigFileName)
     return smpSingletonObj;
 }
 
+std::mutex* GlobalConfig::GetMutex()
+{
+    LOG_DEBUG0("Called.");
+    if (smpSingletonObj == NULL) {
+        LOG_CRITICAL("Attempted to access config before initialzing.");
+        throw std::runtime_error("Config not initialized.");
+    }
+    return &smpSingletonObj->mMutex;
+}
+
 void GlobalConfig::Destroy()
 {
+    LOG_DEBUG0("Called.");
+    sbBeingDestroyed = true;
     if (smpSingletonObj == NULL) {
         return;
     }
@@ -204,7 +220,7 @@ std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
     else if (strConfigName == "db_prefix") {
         return "";
     }
-    else if (strConfigName == "login_port") {
+    else if (strConfigName == "auth_port") {
         return "54231";
     }
     else if (strConfigName == "login_ip") {
@@ -218,6 +234,9 @@ std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
         // Max number of concurrent connections a single client
         // can have open.
         return "2";
+    }
+    else if (strConfigName == "session_timeout") {
+        return "30";
     }
     LOG_ERROR("No default configuration value found.");
     throw std::runtime_error("Configuration value does not have a hardcoded default");

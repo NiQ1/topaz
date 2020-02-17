@@ -12,8 +12,12 @@
 #include <unordered_map>
 #include <stddef.h>
 #include <stdio.h>
+#include <mutex>
 
-// Default configuration file name
+// Easy way to lock the config mutex
+#define LOCK_CONFIG std::lock_guard<std::mutex> l(*GlobalConfig::GetMutex())
+
+ // Default configuration file name
 #define DEFAULT_CONFIG_FILE_NAME "login.conf"
 
 class GlobalConfig;
@@ -83,6 +87,13 @@ public:
     static GlobalConfigPtr GetInstance(std::string& strConfigFileName);
 
     /**
+     *  Gets the global database Mutex object. Lock this before
+     *  any database access.
+     *  @return Database mutex object.
+     */
+    static std::mutex* GetMutex();
+
+    /**
      *  Destroy and remove the current instance. Allows reloading of
      *  the configuration file. Should generally be called only before
      *  the server ends execution.
@@ -133,6 +144,10 @@ private:
 
     /// Current singleton object
     static GlobalConfigPtr smpSingletonObj;
+    /// Current object is already being destroyed
+    static bool sbBeingDestroyed;
+    /// Config access mutex
+    std::mutex mMutex;
 };
 
 #endif
