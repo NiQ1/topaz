@@ -38,8 +38,6 @@ void DataHandler::Run()
     bool bGotKey = false;
     // Error has occurred
     bool bError = false;
-    // Session data from the session tracker
-    SessionTracker::SESSION_DATA SessionData;
 
     LOG_DEBUG0("Called.");
     mbRunning = true;
@@ -72,6 +70,7 @@ void DataHandler::Run()
             bError = true;
             break;
         }
+        time_t now = time(NULL);
         switch (static_cast<CLIENT_TO_SERVER_PACKET_TYPES>(cIncomingPacketType)) {
         case C2S_PACKET_ACCOUNT_ID:
             // Packet is 2 32-bit uints with account ID and server address
@@ -84,7 +83,7 @@ void DataHandler::Run()
             LOG_DEBUG1("Client claims account ID: %d", AccountPacket.dwAccountID);
             // Verify we have it in the session tracker (meaning it passed through the authentication server)
             try {
-                SessionData = SessionTracker::GetInstance()->GetSessionDetails(AccountPacket.dwAccountID);
+                mpSession = SessionTracker::GetInstance()->GetSessionDetails(AccountPacket.dwAccountID);
             }
             catch (std::runtime_error) {
                 LOG_WARNING("Client tried to connect to data server before authenticating.");
@@ -92,12 +91,12 @@ void DataHandler::Run()
                 break;
             }
             // Also verify that it's the same client that authenticated and that the session has not expired
-            if (SessionData.dwIpAddr != mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr) {
+            if (mpSession->GetClientIPAddress() != mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr) {
                 LOG_WARNING("Account ID / IP address mismatch.");
                 bError = true;
                 break;
             }
-            if (SessionData.tmExpires <= time(NULL)) {
+            if (mpSession->HasExpired()) {
                 LOG_WARNING("Client session has expired.");
                 bError = true;
                 break;
@@ -111,17 +110,16 @@ void DataHandler::Run()
             // Packet is a 24-byte key. Add to session data. Note - Since we only accept this packet after
             // the account ID packet has been processed, we know that SessionData is already initialied so
             // no need to do that again.
-            if (mpConnection->ReadAll(SessionData.bufInitialKey, sizeof(SessionData.bufInitialKey)) != sizeof(SessionData.bufInitialKey)) {
+            uint8_t bufNewKey[24];
+            if (mpConnection->ReadAll(bufNewKey, sizeof(bufNewKey)) != sizeof(bufNewKey)) {
                 LOG_WARNING("Client sent an incomplete key packet.");
                 bError = true;
                 break;
             }
-            // Update the key in the session tracker, also give the client more session time because the
-            // session needs to stay alive until the client actually logs into the game, which may take
-            // a while if s/he creating a new character.
+            mpSession->SetKey(bufNewKey);
+            // Update the key in the session tracker, add some time to the TTL if needed
             LOG_DEBUG1("Receving key from client.");
-            SessionData.tmExpires = time(NULL) + 600;
-            SessionTracker::GetInstance()->SetSessionDetails(SessionData);
+            mpSession->SetExpiryTimeRelative(30);
             bGotKey = true;
             LOG_DEBUG1("Key updated.");
             break;
@@ -157,63 +155,28 @@ void DataHandler::Run()
 void DataHandler::SendCharacterList()
 {
     LOG_DEBUG0("Called.");
-    DBConnection DB = Database::GetDatabase();
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
 
-    // The size of the packet is determined by the number of characters
-    // the user is allowed to create, which is the content_ids column
-    // in the accounts table.
-    std::string strSqlQueryFmt("SELECT content_ids FROM %saccounts WHERE id=%d;");
-    std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
-        Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
-        mdwAccountID));
-    mariadb::result_set_ref pResultSet = DB->query(strSqlFinalQuery);
-    if (pResultSet->row_count() == 0) {
-        LOG_ERROR("Failed to query the number of content IDs.");
-        throw std::runtime_error("content_ids query failed.");
+    DATA_PACKET_CHARACTER_ENTRY CharList[16];
+    // Load character list from DB into session
+    mpSession->LoadCharacterList();
+    uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
+    uint8_t cNumChars = min(mpSession->GetNumCharacters(), cNumCharsAllowed);
+    const LoginSession::CHARACTER_ENTRY* pCurrentChar;
+
+    for (uint8_t i = 0; i < cNumChars; i++) {
+        pCurrentChar = mpSession->GetCharacter(i);
+        CharList[cNumChars].dwContentID = pCurrentChar->dwCharacterID;
+        CharList[cNumChars].dwCharacterID = pCurrentChar->dwCharacterID;
     }
-    pResultSet->next();
-    uint8_t cContentIds = pResultSet->get_unsigned8(0);
-    // So now we know the size of the packet we're sending
-    CHARACTER_ENTRY* pCharList = new CHARACTER_ENTRY[cContentIds];
-    try {
-        memset(pCharList, 0, sizeof(CHARACTER_ENTRY) * cContentIds);
-        strSqlQueryFmt = "SELECT id FROM %schars WHERE account_id=%d;";
-        strSqlFinalQuery = FormatString(&strSqlQueryFmt,
-            Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
-            mdwAccountID);
-        pResultSet = DB->query(strSqlFinalQuery);
-        if (pResultSet->row_count() == 0) {
-            LOG_ERROR("Failed to query the list of characters.");
-            throw std::runtime_error("char ids query failed.");
-        }
-        uint8_t cNumchars = 0;
-        uint32_t dwCurrentChar = 0;
-        while (pResultSet->next()) {
-            dwCurrentChar = pResultSet->get_unsigned32(0);
-            pCharList[cNumchars].dwContentID = dwCurrentChar;
-            pCharList[cNumchars].dwCharacterID = dwCurrentChar;
-            cNumchars++;
-            if (cNumchars >= cContentIds) {
-                // Safeguard just in case the DB has more chars than allowed
-                break;
-            }
-        }
-        // The header is the packet type and number of chars, and it actually
-        // overwrites the first two bytes, but since they're guaranteed to be
-        // zero anyway, that's fine.
-        reinterpret_cast<uint8_t*>(pCharList)[0] = static_cast<uint8_t>(S2C_PACKET_CHARACTER_LIST);
-        reinterpret_cast<uint8_t*>(pCharList)[1] = cNumchars;
-        LOG_DEBUG1("Sending character list.");
-        if (mpConnection->WriteAll(reinterpret_cast<uint8_t*>(pCharList), sizeof(CHARACTER_ENTRY) * cContentIds) <= 0) {
-            LOG_ERROR("Connection error when sending character ID list.");
-            throw std::runtime_error("Connection dropped.");
-        }
-        LOG_DEBUG1("Character list send.");
+    // The header is the packet type and number of chars, and it actually
+    // overwrites the first two bytes, but since they're guaranteed to be
+    // zero anyway, that's fine.
+    reinterpret_cast<uint8_t*>(&CharList)[0] = static_cast<uint8_t>(S2C_PACKET_CHARACTER_LIST);
+    reinterpret_cast<uint8_t*>(&CharList)[1] = cNumChars;
+    LOG_DEBUG1("Sending character list.");
+    if (mpConnection->WriteAll(reinterpret_cast<uint8_t*>(&CharList), sizeof(CharList)) <= 0) {
+        LOG_ERROR("Connection error when sending character ID list.");
+        throw std::runtime_error("Connection dropped.");
     }
-    catch (...) {
-        delete pCharList;
-        throw;
-    }
-    delete pCharList;
+    LOG_DEBUG1("Character list send.");
 }

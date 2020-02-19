@@ -48,10 +48,9 @@ uint32_t Authentication::AuthenticateUser(const char* pszUsername, const char* p
         uint32_t dwAccountId = pAccountsFound->get_unsigned32(0);
         // Add this account to the session tracker, which will allow the client
         // to connect to the data server.
-        SessionTracker::GetInstance()->SetSessionDetails({ dwAccountId,
+        SessionTracker::GetInstance()->InitializeNewSession(dwAccountId,
             mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr,
-            {0},
-            time(NULL)+GlobalConfig::GetInstance()->GetConfigUInt("session_timeout") });
+            GlobalConfig::GetInstance()->GetConfigUInt("session_timeout"));
         return dwAccountId;
     }
     catch(...) {
@@ -127,10 +126,9 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         uint32_t dwAccountId = pAccountsFound->get_unsigned32(0);
         // Add this account to the session tracker, which will allow the client
         // to connect to the data server.
-        SessionTracker::GetInstance()->SetSessionDetails({ dwAccountId,
+        SessionTracker::GetInstance()->InitializeNewSession(dwAccountId,
             mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr,
-            {0},
-            time(NULL) + GlobalConfig::GetInstance()->GetConfigUInt("session_timeout") });
+            GlobalConfig::GetInstance()->GetConfigUInt("session_timeout"));
         return dwAccountId;
     }
     catch (...) {

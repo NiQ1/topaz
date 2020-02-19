@@ -10,10 +10,17 @@
 
 #include "ProtocolHandler.h"
 #include "TCPConnection.h"
+#include "LoginSession.h"
 #include <stdint.h>
 
- /**
- *  Login handler class, create an object for each connecting client.
+/**
+ *  Data handler class, create an object for each connecting client.
+ *  The data protocol is between the server and the bootloader, designed
+ *  to emulate certain traffic that on retail is apparently done by
+ *  POL. On retail POL seems to request the server to send certain packets
+ *  on the view port to the client (as well as the other way). Since we
+ *  don't use POL, the data port is used to negotiate when these packets
+ *  are sent.
  */
 class DataHandler : public ProtocolHandler
 {
@@ -39,6 +46,8 @@ public:
 private:
     /// Account ID of the connected user
     uint32_t mdwAccountID;
+    /// Session object for the connection
+    std::shared_ptr<LoginSession> mpSession;
 
     /**
      *  Packet types that the server sends to the client
@@ -77,7 +86,7 @@ private:
     /**
      *  A single entry in the character list sent to the client
      */
-    struct CHARACTER_ENTRY
+    struct DATA_PACKET_CHARACTER_ENTRY
     {
         // Always zero, doesn't seem to have any meaning
         uint8_t ucZero[16];

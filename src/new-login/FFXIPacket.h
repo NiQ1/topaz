@@ -61,6 +61,15 @@ public:
     };
 
     /**
+     *  Error codes sent in FFXI_TYPE_ERROR messages
+     */
+    enum FFXI_ERROR_CODES
+    {
+        // The server does not support this client version
+        FFXI_ERROR_VERSION_MISMATCH = 331
+    };
+
+    /**
      *  Receive a packet from the network.
      *  @return pointer to the received data, including header. The packet data follows the header.
      */

@@ -43,9 +43,11 @@ public:
     enum ACCOUNT_PRIVILEGES
     {
         // Account is enabled (without this it cannot log-in at all)
-        ACCT_PRIV_ENABLED = 1,
+        ACCT_PRIV_ENABLED = 0x01,
         // Account can create characters on test servers
-        ACCT_PRIV_HAS_TEST_ACCESS = 2
+        ACCT_PRIV_HAS_TEST_ACCESS = 0x02,
+        // Account can connect even in maintenance mode
+        ACCT_PRIV_MAINT_MODE_ACCESS = 0x04
     };
 
     /**

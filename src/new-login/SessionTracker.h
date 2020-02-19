@@ -8,6 +8,7 @@
 #ifndef FFXI_LOGIN_SESSIONTRACKER_H
 #define FFXI_LOGIN_SESSIONTRACKER_H
 
+#include "LoginSession.h"
 #include <stddef.h>
 #include <mutex>
 #include <memory>
@@ -51,32 +52,32 @@ public:
     ~SessionTracker();
 
     /**
-     *  Session data
+     *  Initialize a new session given the required initial values.
+     *  @param dwAccountId Account ID of the session being created
+     *  @param dwIpAddr IP address of the client
+     *  @param tmTTL TTL for the session before it's autodeleted (default = 30 seconds)
      */
-    struct SESSION_DATA
-    {
-        // Account ID received from authentication
-        uint32_t dwAccountId;
-        // IP address the user is connecting from
-        uint32_t dwIpAddr;
-        // Initial key to be sent to the map server
-        uint8_t bufInitialKey[24];
-        // When the session expires and auto-removed
-        time_t tmExpires;
-    };
+    void InitializeNewSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL = 30);
 
     /**
      *  Get a session data struct containing the details of a given session.
      *  @param dwAccountId Account ID to look up
      *  @return Session details struct
      */
-    SESSION_DATA GetSessionDetails(uint32_t dwAccountId);
+    std::shared_ptr<LoginSession> GetSessionDetails(uint32_t dwAccountId);
+
+    /**
+     *  Look-up session details by a given IP address.
+     *  @param dwIPAddress IP address (network byte order)
+     *  @return Session details struct
+     */
+    std::shared_ptr<LoginSession> LookupSessionByIP(uint32_t dwIPAddress);
 
     /**
      *  Add or change session details.
      *  @param SessionData New/updated session data to store
      */
-    void SetSessionDetails(SESSION_DATA SessionData);
+    void SetSessionDetails(std::shared_ptr<LoginSession> SessionData);
 
     /**
      *  Manually delete a session.
@@ -102,8 +103,8 @@ private:
     static bool sbBeingDestroyed;
 
     /// All sessions currently being tracked
-    std::map<uint32_t, SESSION_DATA> mmapSessions;
-    /// Database access mutex
+    std::map<uint32_t, std::shared_ptr<LoginSession>> mmapSessions;
+    /// Tracker access mutex
     std::mutex mMutex;
 };
 
