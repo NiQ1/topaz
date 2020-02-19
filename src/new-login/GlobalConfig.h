@@ -15,7 +15,7 @@
 #include <mutex>
 
 // Easy way to lock the config mutex
-#define LOCK_CONFIG std::lock_guard<std::mutex> l(*GlobalConfig::GetMutex())
+#define LOCK_CONFIG std::lock_guard<std::mutex> l_config(*GlobalConfig::GetMutex())
 
  // Default configuration file name
 #define DEFAULT_CONFIG_FILE_NAME "login.conf"

@@ -18,7 +18,7 @@ class SessionTracker;
 typedef SessionTracker* SessionTrackerPtr;
 
 // Easy way to lock the session mutex
-#define LOCK_TRACKER std::lock_guard<std::mutex> l(*SessionTracker::GetMutex())
+#define LOCK_TRACKER std::lock_guard<std::mutex> l_tracker(*SessionTracker::GetMutex())
 
 /**
  *  Session tracker singleton class

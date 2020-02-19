@@ -10,6 +10,9 @@
 
 #include <stdint.h>
 #include <time.h>
+#include <mutex>
+
+#define LOCK_SESSION std::lock_guard<std::mutex> l_session(*LoginSession::GetMutex())
 
 /**
  *  Represents a single open session.
@@ -29,6 +32,12 @@ public:
      *  Destructor
      */
     ~LoginSession();
+
+    /**
+     *  Gets the session mutex object. Lock this before doing any changes.
+     *  @return Database mutex object.
+     */
+    std::mutex* GetMutex();
 
     /**
      *  Get the account ID associated with the session
@@ -160,6 +169,8 @@ private:
     CHARACTER_ENTRY mCharacters[16];
     // Whether character list has been loaded
     bool mbCharListLoaded = false;
+    // Mutex for access sync
+    std::mutex mMutex;
 };
 
 #endif

@@ -32,6 +32,12 @@ LoginSession::~LoginSession()
     LOG_DEBUG0("Called.");
 }
 
+std::mutex* LoginSession::GetMutex()
+{
+    LOG_DEBUG0("Called.");
+    return &mMutex;
+}
+
 uint32_t LoginSession::GetAccountID() const
 {
     return mdwAccountId;
@@ -116,11 +122,14 @@ void LoginSession::LoadCharacterList()
 {
     LOG_DEBUG0("Called.");
     if (mbCharListLoaded) {
-        LOG_WARNING("Character list already loaded, will not load again.");
+        LOG_DEBUG1("Character list already loaded, will not load again.");
         return;
     }
+    LOCK_SESSION;
     DBConnection DB = Database::GetDatabase();
     GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    LOCK_DB;
+    LOCK_CONFIG;
 
     // The size of the packet is determined by the number of characters
     // the user is allowed to create, which is the content_ids column
