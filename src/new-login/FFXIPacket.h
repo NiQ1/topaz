@@ -56,9 +56,31 @@ public:
      */
     enum FFXI_PACKET_TYPES
     {
-        FFXI_TYPE_SUCCESS = 0x03,
+        // Your business with the server completes successfully (server will then disconnect)
+        FFXI_TYPE_DONE = 0x03,
+        // An error has occured (error code attached)
         FFXI_TYPE_ERROR = 0x04,
+        // Server sends the expansions and features list associated with the account
+        FFXI_TYPE_FEATURES_LIST = 0x05,
+        // Request to log-in with an existing character
+        FFXI_TYPE_LOGIN_REQUEST = 0x07,
+        // Server provides details on the map server when logging in
+        FFXI_TYPE_LOGIN_RESPONSE = 0x0B,
+        // Client requests to delete a character
+        FFXI_TYPE_DELETE_CHARACTER = 0x14,
+        // Client requests the list of characters associated with the account
+        FFXI_TYPE_GET_CHARACTER_LIST = 0x1F,
+        // Server sends the account character list
         FFXI_TYPE_CHARACTER_LIST = 0x20,
+        // User just approved the final confirmation of character creation
+        FFXI_TYPE_CREATE_CHAR_CONFIRM = 0x21,
+        // Client requests to create a new character
+        FFXI_TYPE_CREATE_CHARACTER = 0x22,
+        // Server sends the world list
+        FFXI_TYPE_WORLD_LIST = 0x23,
+        // Client requests the world list
+        FFXI_TYPE_GET_WORLD_LIST = 0x24,
+        // Client reports its version and requests the account expansion and features available
         FFXI_TYPE_GET_FEATURES = 0x26
     };
 

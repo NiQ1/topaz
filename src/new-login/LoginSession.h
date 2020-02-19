@@ -99,6 +99,12 @@ public:
     uint32_t GetFeaturesBitmask() const;
 
     /**
+     *  Get the account privileges on this account
+     *  @return Privileges bitmask
+     */
+    uint32_t GetPrivilegesBitmask() const;
+
+    /**
      *  Set the encryption key for this session.
      *  @param bufKey 24 byte long key buffer
      */
@@ -134,6 +140,12 @@ public:
      *  @param dwFeatures New features bitmask
      */
     void SetFeaturesBitmask(uint32_t dwFeatures);
+
+    /**
+     *  Get the account privileges on this account
+     *  @param dwFeatures New privileges bitmask
+     */
+    void SetPrivilegesBitmask(uint32_t dwPrivileges);
 
     /**
      *  A single entry in the account character list
@@ -226,6 +238,8 @@ private:
     uint32_t mdwExpansionsBitmask;
     // Account features bitmask
     uint32_t mdwFeaturesBitmask;
+    // Account privileges bitmask
+    uint32_t mdwPrivilegesBitmask;
     // Character data list
     CHARACTER_ENTRY mCharacters[16];
     // Whether character list has been loaded

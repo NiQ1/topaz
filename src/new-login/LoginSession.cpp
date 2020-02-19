@@ -13,6 +13,8 @@
 #include "Utilities.h"
 #include <string.h>
 
+#define LOCK_SESSION std::lock_guard<std::mutex> l_session(*GetMutex())
+
 LoginSession::LoginSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL) :
     mdwAccountId(dwAccountId),
     mdwIpAddr(dwIpAddr),
@@ -130,6 +132,11 @@ uint32_t LoginSession::GetFeaturesBitmask() const
     return mdwFeaturesBitmask;
 }
 
+uint32_t LoginSession::GetPrivilegesBitmask() const
+{
+    return mdwPrivilegesBitmask;
+}
+
 void LoginSession::SetExpansionsBitmask(uint32_t dwExpansions)
 {
     mdwExpansionsBitmask = dwExpansions;
@@ -138,6 +145,11 @@ void LoginSession::SetExpansionsBitmask(uint32_t dwExpansions)
 void LoginSession::SetFeaturesBitmask(uint32_t dwFeatures)
 {
     mdwFeaturesBitmask = dwFeatures;
+}
+
+void LoginSession::SetPrivilegesBitmask(uint32_t dwPrivileges)
+{
+    mdwFeaturesBitmask = dwPrivileges;
 }
 
 void LoginSession::LoadCharacterList()

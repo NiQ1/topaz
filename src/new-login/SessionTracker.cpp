@@ -55,7 +55,7 @@ SessionTracker::~SessionTracker()
     }
 }
 
-void SessionTracker::InitializeNewSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL)
+std::shared_ptr<LoginSession> SessionTracker::InitializeNewSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL)
 {
     LOG_DEBUG0("Called.");
     LOCK_TRACKER;
@@ -75,7 +75,9 @@ void SessionTracker::InitializeNewSession(uint32_t dwAccountId, uint32_t dwIpAdd
     }
     LOG_INFO("Creating new session.");
     LoginSession* NewSession = new LoginSession(dwAccountId, dwIpAddr, tmTTL);
-    mmapSessions[dwAccountId] = std::shared_ptr<LoginSession>(NewSession);
+    std::shared_ptr<LoginSession> NewSessionPtr(NewSession);
+    mmapSessions[dwAccountId] = NewSessionPtr;
+    return NewSessionPtr;
 }
 
 std::shared_ptr<LoginSession> SessionTracker::GetSessionDetails(uint32_t dwAccountId)

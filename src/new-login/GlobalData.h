@@ -70,6 +70,17 @@ public:
         bool bIsTestWorld;
     };
 
+#pragma pack(push, 1)
+    /**
+     *  World entry as it appears in the FFXI view packet
+     */
+    struct WORLD_PACKET_ENTRY
+    {
+        uint32_t dwWorldID;
+        char szWorldName[16];
+    };
+#pragma pack(pop)
+
 private:
     /**
      *  Private constructor
@@ -80,12 +91,19 @@ private:
      *  Load the world list from the DB
      */
     void LoadWorlds();
-
+    /// World list packet for admins (contains test servers)
+    std::shared_ptr<uint8_t> mbufWorldsPacketAdmin;
+    /// Size of the admin world list packet
+    uint32_t mdwWorldsPacketAdminSize;
+    /// World list packet for users (does not contain test servers)
+    std::shared_ptr<uint8_t> mbufWorldsPacketUser;
+    /// Size of the user world list packet
+    uint32_t mdwWorldsPacketUserSize;
     /// List of worlds known to this server
     std::unordered_map<uint32_t, WORLD_ENTRY> mmapWorldList;
     /// Have we already loaded the world list
     bool mbWorldListLoaded = false;
-
+    
     /// Current singleton object
     static GlobalDataPtr smpSingletonObj;
     /// Current object is already being destroyed

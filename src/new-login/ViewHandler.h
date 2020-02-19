@@ -66,7 +66,7 @@ private:
         uint16_t wFeet;             // 66-->67
         uint16_t wMain;             // 68-->69
         uint16_t wSub;              // 70-->71
-        uint8_t wZone1;             // 72
+        uint8_t cZone1;             // 72
         uint8_t cMainJobLevel;      // 73
         char bufUnknown5[4];        // 74-->77      (0x01, 0x00, 0x02, 0x00)
         uint16_t wZone2;            // 78-->79
@@ -99,6 +99,11 @@ private:
      *  @param pRequestPacket The payload of the request packet
      */
     void CheckVersionAndSendFeatures(uint8_t* pRequestPacket);
+
+    /**
+     *  Send the accout character list to the client.
+     */
+    void SendCharacterList();
 
     /// FFXI Packet parser
     FFXIPacket mParser;

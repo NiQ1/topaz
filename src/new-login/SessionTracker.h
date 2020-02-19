@@ -56,8 +56,9 @@ public:
      *  @param dwAccountId Account ID of the session being created
      *  @param dwIpAddr IP address of the client
      *  @param tmTTL TTL for the session before it's autodeleted (default = 30 seconds)
+     *  @return The newly created session
      */
-    void InitializeNewSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL = 30);
+    std::shared_ptr<LoginSession> InitializeNewSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL = 30);
 
     /**
      *  Get a session data struct containing the details of a given session.

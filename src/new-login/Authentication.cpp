@@ -40,7 +40,8 @@ uint32_t Authentication::AuthenticateUser(const char* pszUsername, const char* p
             return 0;
         }
         pAccountsFound->next();
-        if ((pAccountsFound->get_unsigned32(1) & ACCT_PRIV_ENABLED) == 0) {
+        uint32_t dwPrivileges = pAccountsFound->get_unsigned32(1);
+        if ((dwPrivileges & ACCT_PRIV_ENABLED) == 0) {
             mLastError = AUTH_ACCOUNT_DISABLED;
             return 0;
         }
@@ -48,9 +49,10 @@ uint32_t Authentication::AuthenticateUser(const char* pszUsername, const char* p
         uint32_t dwAccountId = pAccountsFound->get_unsigned32(0);
         // Add this account to the session tracker, which will allow the client
         // to connect to the data server.
-        SessionTracker::GetInstance()->InitializeNewSession(dwAccountId,
+        std::shared_ptr<LoginSession> NewSession = SessionTracker::GetInstance()->InitializeNewSession(dwAccountId,
             mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr,
             GlobalConfig::GetInstance()->GetConfigUInt("session_timeout"));
+        NewSession->SetPrivilegesBitmask(dwPrivileges);
         return dwAccountId;
     }
     catch(...) {
