@@ -67,6 +67,7 @@ public:
         char szWorldName[16];
         char szMQIP[40];
         uint16_t wMQPort;
+        bool bIsTestWorld;
     };
 
 private:

@@ -81,7 +81,7 @@ void GlobalData::LoadWorlds()
     LOCK_DB;
     LOCK_CONFIG;
 
-    std::string strSqlQueryFmt("SELECT id, name, mq_server_ip, mq_server_port FROM %sworlds;");
+    std::string strSqlQueryFmt("SELECT id, name, mq_server_ip, mq_server_port FROM %sworlds WHERE is_active=1;");
     std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
         Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str()));
     mariadb::result_set_ref pResultSet = DB->query(strSqlFinalQuery);
@@ -96,6 +96,7 @@ void GlobalData::LoadWorlds()
         strncpy(NewWorld.szWorldName, pResultSet->get_string(1).c_str(), sizeof(NewWorld.szWorldName) - 1);
         strncpy(NewWorld.szMQIP, pResultSet->get_string(2).c_str(), sizeof(NewWorld.szMQIP) - 1);
         NewWorld.wMQPort = pResultSet->get_unsigned16(3);
+        NewWorld.bIsTestWorld = pResultSet->get_boolean(4);
         mmapWorldList[NewWorld.dwWorldId] = NewWorld;
     }
 }

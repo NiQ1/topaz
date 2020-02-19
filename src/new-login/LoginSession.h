@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <mutex>
+#include <queue>
 
 #define LOCK_SESSION std::lock_guard<std::mutex> l_session(*LoginSession::GetMutex())
 
@@ -150,6 +151,40 @@ public:
      */
     const CHARACTER_ENTRY* GetCharacter(uint8_t cOffset);
 
+    /**
+     *  List of requests that go between the data and view servers.
+     */
+    enum DATA_VIEW_REQUESTS {
+        NO_REQUEST = 0,
+        VIEW_SEND_CHARACTER_LIST
+    };
+
+    /**
+     *  Issued by the view server to send a request to the data server
+     *  @param Request request type to send
+     */
+    void SendRequestToDataServer(DATA_VIEW_REQUESTS Request);
+
+    /**
+     *  Issued by the data server to send a request to the view server
+     *  @param Request request type to send
+     */
+    void SendRequestToViewServer(DATA_VIEW_REQUESTS Request);
+
+    /**
+     *  Issued by the view server to check and receive messages from
+     *  the data server.
+     *  @return Pending request or NO_REQUEST if none
+     */
+    DATA_VIEW_REQUESTS GetRequestFromDataServer();
+
+    /**
+     *  Issued by the data server to check and receive messages from
+     *  the view server.
+     *  @return Pending request or NO_REQUEST if none
+     */
+    DATA_VIEW_REQUESTS GetRequestFromViewServer();
+
 private:
     // Account ID received from authentication
     uint32_t mdwAccountId;
@@ -171,6 +206,10 @@ private:
     bool mbCharListLoaded = false;
     // Mutex for access sync
     std::mutex mMutex;
+    // Requests to the data server
+    std::queue<DATA_VIEW_REQUESTS> mRequestsToData;
+    // Requests to the view server
+    std::queue<DATA_VIEW_REQUESTS> mRequestsToView;
 };
 
 #endif

@@ -188,3 +188,31 @@ void LoginSession::LoadCharacterList()
     mbCharListLoaded = true;
     LOG_DEBUG1("Character list loaded.");
 }
+
+void LoginSession::SendRequestToDataServer(LoginSession::DATA_VIEW_REQUESTS Request)
+{
+    LOCK_SESSION;
+    mRequestsToData.push(Request);
+}
+
+void LoginSession::SendRequestToViewServer(LoginSession::DATA_VIEW_REQUESTS Request)
+{
+    LOCK_SESSION;
+    mRequestsToView.push(Request);
+}
+
+LoginSession::DATA_VIEW_REQUESTS LoginSession::GetRequestFromDataServer()
+{
+    LOCK_SESSION;
+    DATA_VIEW_REQUESTS Request = mRequestsToView.front();
+    mRequestsToView.pop();
+    return Request;
+}
+
+LoginSession::DATA_VIEW_REQUESTS LoginSession::GetRequestFromViewServer()
+{
+    LOCK_SESSION;
+    DATA_VIEW_REQUESTS Request = mRequestsToData.front();
+    mRequestsToData.pop();
+    return Request;
+}

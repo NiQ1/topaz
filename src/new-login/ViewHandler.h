@@ -39,6 +39,48 @@ public:
      */
     void Run();
 
+private:
+
+#pragma pack(push ,1)
+    /**
+     *  Entry of a character in the character list packet
+     */
+    struct VIEW_CHAR_LIST_ENTRY {
+        uint32_t dwCharacterID;     // 0-->3
+        uint32_t dwContentID;       // 4-->7
+        uint32_t dwUnknown1;        // 8-->11       (0x00000001)
+        char szCharacterName[16];   // 12-->27
+        char szWorldName[16];       // 28-->43
+        uint8_t cRace;              // 44
+        uint8_t cUnknown2;          // 45
+        uint8_t cMainJob;           // 46
+        char bufUnknown3[9];        // 47-->55
+        uint8_t cFace;              // 56
+        uint8_t cUnknown4;          // 57           (0x02)
+        uint16_t wHead;             // 58-->59
+        uint16_t wBody;             // 60-->61
+        uint16_t wHands;            // 62-->63
+        uint16_t wLegs;             // 64-->65
+        uint16_t wFeet;             // 66-->67
+        uint16_t wMain;             // 68-->69
+        uint16_t wSub;              // 70-->71
+        uint8_t wZone1;             // 72
+        uint8_t cMainJobLevel;      // 73
+        char bufUnknown5[4];        // 74-->77      (0x01, 0x00, 0x02, 0x00)
+        uint16_t wZone2;            // 78-->79
+        char bufUnknown6[60];       // 80-->139
+    };
+
+    /**
+     *  Full character list packet
+     */
+    struct VIEW_PACKET_CHARACTER_LIST
+    {
+        uint32_t dwContentIds;  // 0-->3
+        VIEW_CHAR_LIST_ENTRY[16];
+    };
+#pragma pack(pop)
+
 };
 
 #endif
