@@ -9,6 +9,8 @@
 #define FFXI_LOGIN_VIEWHANDLER_H
 
 #include "ProtocolHandler.h"
+#include "FFXIPacket.h"
+#include "LoginSession.h"
 #include <memory>
 
 /**
@@ -77,10 +79,31 @@ private:
     struct VIEW_PACKET_CHARACTER_LIST
     {
         uint32_t dwContentIds;  // 0-->3
-        VIEW_CHAR_LIST_ENTRY[16];
+        VIEW_CHAR_LIST_ENTRY CharList[16];
     };
+
+    /**
+     *  Features and expansion packet
+     */
+    struct VIEW_PACKET_EXPANSION_AND_FEATURES
+    {
+        uint32_t dwUnknown;
+        uint32_t dwExpansions;
+        uint32_t dwFeatures;
+    };
+
 #pragma pack(pop)
 
+    /**
+     *  Check the client version and send back a list of features
+     *  @param pRequestPacket The payload of the request packet
+     */
+    void CheckVersionAndSendFeatures(uint8_t* pRequestPacket);
+
+    /// FFXI Packet parser
+    FFXIPacket mParser;
+    /// Associated session
+    std::shared_ptr<LoginSession> mpSession;
 };
 
 #endif

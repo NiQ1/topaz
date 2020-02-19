@@ -110,3 +110,12 @@ void FFXIPacket::SendPacket(FFXI_PACKET_TYPES eType, uint8_t* pData, uint32_t cb
     }
     delete pPacket;
 }
+
+void FFXIPacket::SendError(FFXI_ERROR_CODES ErrorCode)
+{
+    LOG_WARNING("Sending error %d to the client.", ErrorCode);
+    FFXI_ERROR_PACKET ErrorPacket;
+    ErrorPacket.dwErrorCode = static_cast<uint32_t>(ErrorCode);
+    ErrorPacket.dwZero = 0;
+    SendPacket(FFXI_TYPE_ERROR, reinterpret_cast<uint8_t*>(&ErrorPacket), sizeof(ErrorPacket));
+}

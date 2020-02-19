@@ -19,7 +19,9 @@ LoginSession::LoginSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL
     mbIgnoreOnIPLookup(false),
     mcNumCharacters(0),
     mcNumCharsAllowed(0),
-    mbCharListLoaded(false)
+    mbCharListLoaded(false),
+    mdwExpansionsBitmask(0),
+    mdwFeaturesBitmask(0)
 {
     LOG_DEBUG0("Called.");
     memset(mbufInitialKey, 0, sizeof(mbufInitialKey));
@@ -116,6 +118,26 @@ void LoginSession::SetExpiryTimeRelative(time_t tmNewTTL, bool bAllowDecrease)
 void LoginSession::SetIgnoreIPLookupFlag(bool bNewFlag)
 {
     mbIgnoreOnIPLookup = bNewFlag;
+}
+
+uint32_t LoginSession::GetExpansionsBitmask() const
+{
+    return mdwExpansionsBitmask;
+}
+
+uint32_t LoginSession::GetFeaturesBitmask() const
+{
+    return mdwFeaturesBitmask;
+}
+
+void LoginSession::SetExpansionsBitmask(uint32_t dwExpansions)
+{
+    mdwExpansionsBitmask = dwExpansions;
+}
+
+void LoginSession::SetFeaturesBitmask(uint32_t dwFeatures)
+{
+    mdwFeaturesBitmask = dwFeatures;
 }
 
 void LoginSession::LoadCharacterList()

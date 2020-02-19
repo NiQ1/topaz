@@ -241,6 +241,15 @@ std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
     else if (strConfigName == "session_timeout") {
         return "30";
     }
+    else if (strConfigName == "expected_client_version") {
+        return "30191004_0";
+    }
+    else if (strConfigName == "version_lock") {
+        // 0 - No version lock
+        // 1 - Version lock, only expected client version can connect
+        // 2 - One way version lock, expected client version or greater can connect
+        return "0";
+    }
     LOG_ERROR("No default configuration value found.");
     throw std::runtime_error("Configuration value does not have a hardcoded default");
 }

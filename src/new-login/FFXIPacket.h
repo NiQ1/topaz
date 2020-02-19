@@ -57,7 +57,9 @@ public:
     enum FFXI_PACKET_TYPES
     {
         FFXI_TYPE_SUCCESS = 0x03,
-        FFXI_TYPE_ERROR = 0x04
+        FFXI_TYPE_ERROR = 0x04,
+        FFXI_TYPE_CHARACTER_LIST = 0x20,
+        FFXI_TYPE_GET_FEATURES = 0x26
     };
 
     /**
@@ -88,6 +90,23 @@ public:
      *  @param cbData Size of the data (without header) in bytes
      */
     void SendPacket(FFXI_PACKET_TYPES eType, uint8_t* pData, uint32_t cbData);
+
+    /**
+     *  Sends an error packet to the client
+     *  @param ErrorCode Error code to send (from FFXI_ERROR_CODES enum)
+     */
+    void SendError(FFXI_ERROR_CODES ErrorCode);
+
+#pragma pack(push, 1)
+    /**
+     *  Structure of an error packet payload
+     */
+    struct FFXI_ERROR_PACKET
+    {
+        uint32_t dwZero;
+        uint32_t dwErrorCode;
+    };
+#pragma pack(pop)
 
 private:
 

@@ -13,8 +13,6 @@
 #include <mutex>
 #include <queue>
 
-#define LOCK_SESSION std::lock_guard<std::mutex> l_session(*LoginSession::GetMutex())
-
 /**
  *  Represents a single open session.
  */
@@ -89,6 +87,18 @@ public:
     uint8_t GetNumCharsAllowed() const;
 
     /**
+     *  Get the allowed expansions for this user
+     *  @return Expansions bitmask
+     */
+    uint32_t GetExpansionsBitmask() const;
+
+    /**
+     *  Get the account features on this account
+     *  @return Features bitmask
+     */
+    uint32_t GetFeaturesBitmask() const;
+
+    /**
      *  Set the encryption key for this session.
      *  @param bufKey 24 byte long key buffer
      */
@@ -112,6 +122,18 @@ public:
      *  @param bNewFlag Set to true to exclude the session from IP lookups
      */
     void SetIgnoreIPLookupFlag(bool bNewFlag);
+
+    /**
+     *  Set the allowed expansions for this user
+     *  @param dwExpansions New expansions bitmask
+     */
+    void SetExpansionsBitmask(uint32_t dwExpansions);
+
+    /**
+     *  Get the account features on this account
+     *  @param dwFeatures New features bitmask
+     */
+    void SetFeaturesBitmask(uint32_t dwFeatures);
 
     /**
      *  A single entry in the account character list
@@ -200,6 +222,10 @@ private:
     uint8_t mcNumCharacters;
     // Number of characters the user is allowed
     uint8_t mcNumCharsAllowed;
+    // Account expansion bitmask
+    uint32_t mdwExpansionsBitmask;
+    // Account features bitmask
+    uint32_t mdwFeaturesBitmask;
     // Character data list
     CHARACTER_ENTRY mCharacters[16];
     // Whether character list has been loaded
