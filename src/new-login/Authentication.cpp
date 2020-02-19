@@ -128,9 +128,11 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         uint32_t dwAccountId = pAccountsFound->get_unsigned32(0);
         // Add this account to the session tracker, which will allow the client
         // to connect to the data server.
-        SessionTracker::GetInstance()->InitializeNewSession(dwAccountId,
+        std::shared_ptr<LoginSession> NewSession = SessionTracker::GetInstance()->InitializeNewSession(dwAccountId,
             mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr,
             GlobalConfig::GetInstance()->GetConfigUInt("session_timeout"));
+        // Assume newly created accounts are normal users so we can save a DB query
+        NewSession->SetPrivilegesBitmask(ACCT_PRIV_ENABLED);
         return dwAccountId;
     }
     catch (...) {

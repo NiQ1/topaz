@@ -44,6 +44,12 @@ public:
     virtual bool IsRunning() const;
 
     /**
+     *  Returns whether the thread has finished execution.
+     *  @return True if thread routine has ended.
+     */
+    virtual bool IsFinished() const;
+
+    /**
      *  Start the thread. You should generally call this
      *  instead of run.
      */
@@ -60,6 +66,8 @@ protected:
     bool mbShutdown;
     /// Whether server is currently running
     bool mbRunning;
+    /// Whether the thread has finished execution
+    bool mbFinished;
     /// Associated thread object
     std::shared_ptr<std::thread> mpThreadObj;
 

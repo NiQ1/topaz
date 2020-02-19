@@ -13,9 +13,10 @@
 #include "GlobalConfig.h"
 #include "GlobalData.h"
 #include "Utilities.h"
+#include "Authentication.h"
 #include <time.h>
 
-#define LOCK_SESSION std::lock_guard<std::mutex> l_session(*mpSession->GetMutex())
+#define LOCK_SESSION std::lock_guard<std::recursive_mutex> l_session(*mpSession->GetMutex())
 
 ViewHandler::ViewHandler(std::shared_ptr<TCPConnection> connection) : ProtocolHandler(connection), mParser(connection)
 {
@@ -58,21 +59,28 @@ void ViewHandler::Run()
 
             // Do we have a packet from the client?
             if (mpConnection->CanRead(1000)) {
-                pRawData = mParser.ReceivePacket();
+                try {
+                    pRawData = mParser.ReceivePacket();
+                }
+                catch (std::runtime_error) {
+                    LOG_INFO("Connection closed.");
+                    break;
+                }
                 // Nasty but needed trick to get the raw pointer
                 pPacketHeader = reinterpret_cast<FFXIPacket::FFXI_PACKET_HEADER*>(&(*pRawData));
                 pPayloadData = (&(*pRawData)) + sizeof(FFXIPacket::FFXI_PACKET_HEADER);
 
-                switch (pPacketHeader->dwPacketSize) {
+                switch (pPacketHeader->dwPacketType) {
                 case FFXIPacket::FFXI_TYPE_GET_FEATURES:
                     CheckVersionAndSendFeatures(pPayloadData);
                     break;
                 case FFXIPacket::FFXI_TYPE_GET_CHARACTER_LIST:
                     SendCharacterList();
                     break;
-
+                case FFXIPacket::FFXI_TYPE_GET_WORLD_LIST:
+                    SendWorldList();
+                    break;
                 }
-
             }
         }
     }
@@ -150,11 +158,19 @@ void ViewHandler::SendCharacterList()
     GlobalDataPtr GlobData = GlobalData::GetInstance();
 
     CharListPacket.dwContentIds = mpSession->GetNumCharsAllowed();
+    // Set the enabled bit on the allowed slots so the client knows it can
+    // use these content IDs.
+    for (uint8_t i = 0; i < cNumCharsAllowed; i++) {
+        CharListPacket.CharList[i].dwEnabled = 1;
+        // Charname is a space == character doesn't exist
+        // (Will be overwritten later for characters that do exist).
+        CharListPacket.CharList[i].szCharacterName[0] = ' ';
+    }
     for (uint8_t i = 0; i < cNumChars; i++) {
         pCurrentChar = mpSession->GetCharacter(i);
         CharListPacket.CharList[i].dwCharacterID = pCurrentChar->dwCharacterID;
         CharListPacket.CharList[i].dwContentID = pCurrentChar->dwCharacterID;
-        CharListPacket.CharList[i].dwUnknown1 = 1;
+        CharListPacket.CharList[i].dwEnabled = 1;
         strncpy(CharListPacket.CharList[i].szCharacterName, pCurrentChar->szCharName, sizeof(CharListPacket.CharList[i].szCharacterName) - 1);
         strncpy(CharListPacket.CharList[i].szWorldName, GlobData->GetWorldName(pCurrentChar->cWorldID).c_str(), sizeof(CharListPacket.CharList[i].szWorldName));
         CharListPacket.CharList[i].cRace = pCurrentChar->cRace;
@@ -178,5 +194,30 @@ void ViewHandler::SendCharacterList()
     }
     LOG_DEBUG1("Sending character list.");
     mParser.SendPacket(FFXIPacket::FFXI_TYPE_CHARACTER_LIST, reinterpret_cast<uint8_t*>(&CharListPacket), sizeof(CharListPacket));
-    LOG_DEBUG1("Character list send.");
+    LOG_DEBUG1("Character list sent.");
+}
+
+void ViewHandler::SendWorldList()
+{
+    LOG_DEBUG0("Called.");
+    GlobalDataPtr GlobData = GlobalData::GetInstance();
+
+    std::shared_ptr<uint8_t> pWorldListPacket;
+    uint32_t dwWorldListPacketSize = 0;
+
+    if ((mpSession->GetPrivilegesBitmask() & Authentication::ACCT_PRIV_HAS_TEST_ACCESS) != 0) {
+        // User has test server access so they get the admin packet
+        LOG_DEBUG1("User has test server access.");
+        pWorldListPacket = GlobData->GetAdminWorldsPacket();
+        dwWorldListPacketSize = GlobData->GetAdminWorldsPacketSize();
+    }
+    else {
+        // Just a regular boring user
+        LOG_DEBUG1("User does not have test server access.");
+        pWorldListPacket = GlobData->GetUserWorldsPacket();
+        dwWorldListPacketSize = GlobData->GetUserWorldsPacketSize();
+    }
+    LOG_DEBUG1("Sending world list.");
+    mParser.SendPacket(FFXIPacket::FFXI_TYPE_WORLD_LIST, &(*pWorldListPacket), dwWorldListPacketSize);
+    LOG_DEBUG1("World list sent.");
 }

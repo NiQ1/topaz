@@ -9,7 +9,7 @@
 #include "Debugging.h"
 #include <stdexcept>
 
-Thread::Thread() : mbRunning(false), mbShutdown(false)
+Thread::Thread() : mbRunning(false), mbShutdown(false), mbFinished(false)
 {
     LOG_DEBUG0("Called.");
 }
@@ -23,6 +23,11 @@ Thread::~Thread()
 bool Thread::IsRunning() const
 {
     return mbRunning;
+}
+
+bool Thread::IsFinished() const
+{
+    return mbFinished;
 }
 
 void Thread::Shutdown(bool bJoin)
@@ -58,7 +63,12 @@ void Thread::stRun(Thread* thisobj)
     try {
         thisobj->Run();
     }
-    catch (...) {
-        LOG_ERROR("Uncaught exception in thread!");
+    catch (std::exception& ex) {
+        LOG_ERROR("Uncaught exception in thread: %s", ex.what());
     }
+    catch (...) {
+        LOG_ERROR("Uncaught unknown exception in thread!");
+    }
+    thisobj->mbRunning = false;
+    thisobj->mbFinished = true;
 }

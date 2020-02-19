@@ -8,6 +8,7 @@
 #include "ProtocolFactory.h"
 #include "AuthHandler.h"
 #include "DataHandler.h"
+#include "ViewHandler.h"
 #include "Debugging.h"
 #include <stdexcept>
 
@@ -22,6 +23,9 @@ ProtocolHandler* ProtocolFactory::BuildHandler(LOGIN_PROTOCOLS protocol, std::sh
     case PROTOCOL_DATA:
         LOG_DEBUG0("Constructing data handler.");
         return new DataHandler(connection);
+    case PROTOCOL_VIEW:
+        LOG_DEBUG0("Constructing view handler.");
+        return new ViewHandler(connection);
     }
     LOG_CRITICAL("Protocol factory called with unknown or unsupported protocol.");
     throw std::logic_error("Invalid or unsupported protocol");

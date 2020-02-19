@@ -22,7 +22,7 @@ SessionTrackerPtr SessionTracker::GetInstance()
     return smpSingletonObj;
 }
 
-std::mutex* SessionTracker::GetMutex()
+std::recursive_mutex* SessionTracker::GetMutex()
 {
     // Commented out - Spams the log
     // LOG_DEBUG0("Called.");
@@ -62,16 +62,17 @@ std::shared_ptr<LoginSession> SessionTracker::InitializeNewSession(uint32_t dwAc
     time_t now = time(NULL);
     auto data = mmapSessions.find(dwAccountId);
     if (data != mmapSessions.end()) {
-        LOG_INFO("Session already exists");
+        LOG_INFO("Session already exists, overwriting.");
         // A session has already been found for the said account
         if (data->second->GetClientIPAddress() == dwIpAddr) {
-            // Matches the IP address we have so just increase the TTL if needed
-            // and return silently.
-            data->second->SetExpiryTimeRelative(tmTTL);
+            // Matches the IP address we already have so overwrite it
+            mmapSessions.erase(data->first);
         }
-        // If it's from a different IP then this is an error
-        LOG_ERROR("Received a session request for the same account from different IP address.");
-        throw std::runtime_error("Session exists with different IP");
+        else {
+            // If it's from a different IP then this is an error
+            LOG_ERROR("Received a session request for the same account from different IP address.");
+            throw std::runtime_error("Session exists with different IP");
+        }
     }
     LOG_INFO("Creating new session.");
     LoginSession* NewSession = new LoginSession(dwAccountId, dwIpAddr, tmTTL);

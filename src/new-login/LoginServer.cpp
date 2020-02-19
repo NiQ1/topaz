@@ -171,10 +171,16 @@ void LoginServer::Run()
                         static_cast<ProtocolFactory::LOGIN_PROTOCOLS>(mvecListeningSockets[i].iAssociatedProtocol),
                         NewTCPConnection);
                     pNewHandler->StartThread();
-                    while (pNewHandler->IsRunning() == false) {
+                    while ((pNewHandler->IsRunning() == false) && (pNewHandler->IsFinished() == false)) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     }
-                    mvecWorkingHandlers.push_back(std::shared_ptr<ProtocolHandler>(pNewHandler));
+                    if (pNewHandler->IsFinished()) {
+                        LOG_ERROR("Thread exited prematurely, discarding.");
+                        delete pNewHandler;
+                    }
+                    else {
+                        mvecWorkingHandlers.push_back(std::shared_ptr<ProtocolHandler>(pNewHandler));
+                    }
                 }
                 else {
                     NewTCPConnection->Close();
@@ -184,7 +190,7 @@ void LoginServer::Run()
         // Clean up already finished threads from the vector
         i = 0;
         while (i < mvecWorkingHandlers.size()) {
-            if (mvecWorkingHandlers[i]->IsRunning() == false) {
+            if (mvecWorkingHandlers[i]->IsFinished()) {
                 mvecWorkingHandlers[i]->Shutdown();
                 mvecWorkingHandlers.erase(mvecWorkingHandlers.begin()+i);
             }

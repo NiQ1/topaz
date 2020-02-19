@@ -15,7 +15,7 @@
 #include <mutex>
 
 // Easy way to lock the config mutex
-#define LOCK_CONFIG std::lock_guard<std::mutex> l_config(*GlobalConfig::GetMutex())
+#define LOCK_CONFIG std::lock_guard<std::recursive_mutex> l_config(*GlobalConfig::GetMutex())
 
  // Default configuration file name
 #define DEFAULT_CONFIG_FILE_NAME "login.conf"
@@ -91,7 +91,7 @@ public:
      *  any database access.
      *  @return Database mutex object.
      */
-    static std::mutex* GetMutex();
+    static std::recursive_mutex* GetMutex();
 
     /**
      *  Destroy and remove the current instance. Allows reloading of
@@ -147,7 +147,7 @@ private:
     /// Current object is already being destroyed
     static bool sbBeingDestroyed;
     /// Config access mutex
-    std::mutex mMutex;
+    std::recursive_mutex mMutex;
 };
 
 #endif

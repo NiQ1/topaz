@@ -13,7 +13,7 @@
 #include "Utilities.h"
 #include <string.h>
 
-#define LOCK_SESSION std::lock_guard<std::mutex> l_session(*GetMutex())
+#define LOCK_SESSION std::lock_guard<std::recursive_mutex> l_session(*GetMutex())
 
 LoginSession::LoginSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL) :
     mdwAccountId(dwAccountId),
@@ -36,7 +36,7 @@ LoginSession::~LoginSession()
     LOG_DEBUG0("Called.");
 }
 
-std::mutex* LoginSession::GetMutex()
+std::recursive_mutex* LoginSession::GetMutex()
 {
     LOG_DEBUG0("Called.");
     return &mMutex;
@@ -178,20 +178,16 @@ void LoginSession::LoadCharacterList()
         throw std::runtime_error("content_ids query failed.");
     }
     pResultSet->next();
-    mcNumCharsAllowed = pResultSet->get_unsigned8(0);
+    mcNumCharsAllowed = static_cast<uint8_t>(pResultSet->get_unsigned32(0));
     CHARACTER_ENTRY CharList[16];
     memset(&CharList, 0, sizeof(CharList));
     strSqlQueryFmt = "SELECT id, name, account_id, world_id, main_job, main_job_lv, "
-        "zone, race, face, head, body, heands, legs, feet, main, sub "
+        "zone, race, face, head, body, hands, legs, feet, main, sub "
         "FROM %schars WHERE account_id=%d LIMIT %u;";
     strSqlFinalQuery = FormatString(&strSqlQueryFmt,
         Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
         mdwAccountId, static_cast<uint32_t>(mcNumCharsAllowed));
     pResultSet = DB->query(strSqlFinalQuery);
-    if (pResultSet->row_count() == 0) {
-        LOG_ERROR("Failed to query the list of characters.");
-        throw std::runtime_error("char ids query failed.");
-    }
     uint8_t cNumchars = 0;
     uint32_t dwCurrentChar = 0;
     while (pResultSet->next()) {
@@ -200,19 +196,19 @@ void LoginSession::LoadCharacterList()
         CharList[cNumchars].dwCharacterID = dwCurrentChar;
         strncpy(CharList[cNumchars].szCharName, pResultSet->get_string(1).c_str(), sizeof(CharList[cNumchars].szCharName));
         CharList[cNumchars].dwAccountID = pResultSet->get_unsigned32(2);
-        CharList[cNumchars].cWorldID = pResultSet->get_unsigned8(3);
-        CharList[cNumchars].cMainJob = pResultSet->get_unsigned8(4);
-        CharList[cNumchars].cMainJobLevel = pResultSet->get_unsigned8(5);
-        CharList[cNumchars].wZone = pResultSet->get_unsigned16(6);
-        CharList[cNumchars].cRace = pResultSet->get_unsigned8(7);
-        CharList[cNumchars].wFace = pResultSet->get_unsigned16(8);
-        CharList[cNumchars].wHead = pResultSet->get_unsigned16(9);
-        CharList[cNumchars].wBody = pResultSet->get_unsigned16(10);
-        CharList[cNumchars].wHands = pResultSet->get_unsigned16(11);
-        CharList[cNumchars].wLegs = pResultSet->get_unsigned16(12);
-        CharList[cNumchars].wFeet = pResultSet->get_unsigned16(13);
-        CharList[cNumchars].wMain = pResultSet->get_unsigned16(14);
-        CharList[cNumchars].wSub = pResultSet->get_unsigned16(15);
+        CharList[cNumchars].cWorldID = static_cast<uint8_t>(pResultSet->get_unsigned32(3));
+        CharList[cNumchars].cMainJob = static_cast<uint8_t>(pResultSet->get_unsigned32(4));
+        CharList[cNumchars].cMainJobLevel = static_cast<uint8_t>(pResultSet->get_unsigned32(5));
+        CharList[cNumchars].wZone = static_cast<uint16_t>(pResultSet->get_unsigned32(6));
+        CharList[cNumchars].cRace = static_cast<uint8_t>(pResultSet->get_unsigned32(7));
+        CharList[cNumchars].wFace = static_cast<uint16_t>(pResultSet->get_unsigned32(8));
+        CharList[cNumchars].wHead = static_cast<uint16_t>(pResultSet->get_unsigned32(9));
+        CharList[cNumchars].wBody = static_cast<uint16_t>(pResultSet->get_unsigned32(10));
+        CharList[cNumchars].wHands = static_cast<uint16_t>(pResultSet->get_unsigned32(11));
+        CharList[cNumchars].wLegs = static_cast<uint16_t>(pResultSet->get_unsigned32(12));
+        CharList[cNumchars].wFeet = static_cast<uint16_t>(pResultSet->get_unsigned32(13));
+        CharList[cNumchars].wMain = static_cast<uint16_t>(pResultSet->get_unsigned32(14));
+        CharList[cNumchars].wSub = static_cast<uint16_t>(pResultSet->get_unsigned32(15));
         cNumchars++;
         if (cNumchars >= mcNumCharsAllowed) {
             // Safeguard just in case the DB has more chars than allowed

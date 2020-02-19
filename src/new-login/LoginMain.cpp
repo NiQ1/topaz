@@ -58,8 +58,11 @@ int main(int argc, char* argv[])
     LoginServer LoginServerInstance;
     // Authentication server
     LoginServerInstance.AddBind(ProtocolFactory::PROTOCOL_AUTH, Config->GetConfigUInt("auth_port"));
-    // Key management and character list server
+    // Key management and character list server (communicates with the bootloader)
     LoginServerInstance.AddBind(ProtocolFactory::PROTOCOL_DATA, Config->GetConfigUInt("data_port"));
+    // Lobby server (communicates with the game client). Port not configurable because it's
+    // hardcoded in the game client.
+    LoginServerInstance.AddBind(ProtocolFactory::PROTOCOL_VIEW, 54001);
     LoginServerInstance.StartThread();
 
     LOG_INFO("Initialization complete, server is running.");

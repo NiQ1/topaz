@@ -24,7 +24,7 @@ DBConnection Database::GetDatabase()
     return smpSingletonObj->mpConnection;
 }
 
-std::mutex* Database::GetMutex()
+std::recursive_mutex* Database::GetMutex()
 {
     LOG_DEBUG0("Called.");
     if (smpSingletonObj == NULL) {

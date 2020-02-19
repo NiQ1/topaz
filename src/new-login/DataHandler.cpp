@@ -134,7 +134,7 @@ void DataHandler::Run()
         }
         // Determine what our answer is going to be. If we arrived here we know that the
         // client has already provided its account ID so no need to check that
-        if (bGotKey == false) {
+        /*if (bGotKey == false) {
             // We still need the key
             cOutgoingBytePacket = static_cast<uint8_t>(S2C_PACKET_SEND_KEY);
             if (mpConnection->WriteAll(&cOutgoingBytePacket, sizeof(cOutgoingBytePacket)) != sizeof(cOutgoingBytePacket)) {
@@ -142,10 +142,12 @@ void DataHandler::Run()
                 break;
             }
         }
-        else {
+        else {*/
             LOG_DEBUG1("Sending character list to client.");
+            // Seems that xiloader doesn't like us to send the list too quickly
+            std::this_thread::sleep_for(std::chrono::seconds(1));
             SendCharacterList();
-        }
+        //}
     }
     LOG_INFO("Client successfully connected with account ID: %d", mdwAccountID);
     mpConnection->Close();

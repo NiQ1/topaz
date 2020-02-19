@@ -49,7 +49,7 @@ std::string GlobalConfig::GetConfigString(const std::string& strConfigName)
     LOG_DEBUG1("Searching configuration for: %s", strConfigName.c_str());
     auto strVal = mmapStringVals.find(strConfigName);
     if (strVal != mmapStringVals.end()) {
-        LOG_DEBUG1("Value found in cache: %s", strVal->first);
+        LOG_DEBUG1("Value found in cache: %s", strVal->first.c_str());
         return strVal->second;
     }
     if (mhConfigFile) {
@@ -161,7 +161,7 @@ GlobalConfigPtr GlobalConfig::GetInstance(std::string& strConfigFileName)
     return smpSingletonObj;
 }
 
-std::mutex* GlobalConfig::GetMutex()
+std::recursive_mutex* GlobalConfig::GetMutex()
 {
     LOG_DEBUG0("Called.");
     if (smpSingletonObj == NULL) {
@@ -235,8 +235,9 @@ std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
     }
     else if (strConfigName == "max_client_connections") {
         // Max number of concurrent connections a single client
-        // can have open.
-        return "2";
+        // can have open. Note - Each client needs at least 3 concurrent
+        // connections (auth, data and view)
+        return "10";
     }
     else if (strConfigName == "session_timeout") {
         return "30";

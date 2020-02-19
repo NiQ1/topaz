@@ -16,7 +16,7 @@ class Database;
 typedef Database* DatabasePtr;
 
 // Easy way to lock the DB mutex
-#define LOCK_DB std::lock_guard<std::mutex> l_db(*Database::GetMutex())
+#define LOCK_DB std::lock_guard<std::recursive_mutex> l_db(*Database::GetMutex())
 
 // Hack around a bug in MariaDB++ which causes a compile error on Windows
 // if WinSock2.h is included before its headers.
@@ -46,7 +46,7 @@ public:
      *  any database access.
      *  @return Database mutex object.
      */
-    static std::mutex* GetMutex();
+    static std::recursive_mutex* GetMutex();
 
     /**
      *  Return an instance to the singleton.
@@ -114,7 +114,7 @@ private:
     /// MariaDB++ account handle
     DBAccount mpAccount;
     /// Database access mutex
-    std::mutex mMutex;
+    std::recursive_mutex mMutex;
 };
 
 #endif

@@ -51,21 +51,23 @@ std::shared_ptr<uint8_t> FFXIPacket::ReceivePacket()
     uint8_t* PacketData = new uint8_t[Header.dwPacketSize + sizeof(FFXI_PACKET_HEADER)];
     memcpy(PacketData, &Header, sizeof(Header));
     // Read the rest of the packet
-    if (mpConnection->ReadAll(PacketData + sizeof(Header), Header.dwPacketSize) <= 0) {
+    if (mpConnection->ReadAll(PacketData + sizeof(Header), Header.dwPacketSize - sizeof(FFXI_PACKET_HEADER)) <= 0) {
         LOG_WARNING("Client dropped connection while reading data.");
         delete PacketData;
         throw std::runtime_error("Client dropped connection mid-packet.");
     }
     // Verify packet integrity
-    memset(reinterpret_cast<FFXI_PACKET_HEADER*>(PacketData)->bufMD5, 0, sizeof(reinterpret_cast<FFXI_PACKET_HEADER*>(PacketData)->bufMD5));
-    uint8_t bufMD5[16];
-    MD5(PacketData, Header.dwPacketSize, bufMD5);
-    if (memcmp(bufMD5, reinterpret_cast<FFXI_PACKET_HEADER*>(PacketData)->bufMD5, sizeof(bufMD5)) != 0) {
-        LOG_WARNING("Packet MD5 mismatch.");
-        delete PacketData;
-        throw std::runtime_error("Packet MD5 mismatch.");
-    }
-    memcpy(reinterpret_cast<FFXI_PACKET_HEADER*>(PacketData)->bufMD5, Header.bufMD5, sizeof(reinterpret_cast<FFXI_PACKET_HEADER*>(PacketData)->bufMD5));
+    // Disabled - Seems that newer client just send all zeros (but since we still may want to support
+    // older clients then we will calculate MD5 for packets that we send).
+    // memset(reinterpret_cast<FFXI_PACKET_HEADER*>(PacketData)->bufMD5, 0, sizeof(reinterpret_cast<FFXI_PACKET_HEADER*>(PacketData)->bufMD5));
+    // uint8_t bufMD5[16];
+    // MD5(PacketData, Header.dwPacketSize, bufMD5);
+    // if (memcmp(bufMD5, Header.bufMD5, sizeof(bufMD5)) != 0) {
+    //     LOG_WARNING("Packet MD5 mismatch.");
+    //     delete PacketData;
+    //     throw std::runtime_error("Packet MD5 mismatch.");
+    // }
+    //memcpy(reinterpret_cast<FFXI_PACKET_HEADER*>(PacketData)->bufMD5, Header.bufMD5, sizeof(reinterpret_cast<FFXI_PACKET_HEADER*>(PacketData)->bufMD5));
     LOG_DEBUG0("Received packet, %d bytes.", Header.dwPacketSize);
     return std::shared_ptr<uint8_t>(PacketData);
 }
@@ -95,7 +97,7 @@ void FFXIPacket::SendPacket(FFXI_PACKET_TYPES eType, uint8_t* pData, uint32_t cb
     // Allocate buffer for the packet including the header
     uint8_t* pPacket = new uint8_t[cbData + sizeof(FFXI_PACKET_HEADER)];
     FFXI_PACKET_HEADER* pHeader = reinterpret_cast<FFXI_PACKET_HEADER*>(pPacket);
-    pHeader->dwPacketSize = cbData;
+    pHeader->dwPacketSize = cbData + sizeof(FFXI_PACKET_HEADER);
     memcpy(pHeader->bufMagic, mbufPacketMagic, sizeof(pHeader->bufMagic));
     pHeader->dwPacketType = static_cast<uint32_t>(eType);
     memcpy(pPacket + sizeof(FFXI_PACKET_HEADER), pData, cbData);

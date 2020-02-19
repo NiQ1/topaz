@@ -18,7 +18,7 @@ class SessionTracker;
 typedef SessionTracker* SessionTrackerPtr;
 
 // Easy way to lock the session mutex
-#define LOCK_TRACKER std::lock_guard<std::mutex> l_tracker(*SessionTracker::GetMutex())
+#define LOCK_TRACKER std::lock_guard<std::recursive_mutex> l_tracker(*SessionTracker::GetMutex())
 
 /**
  *  Session tracker singleton class
@@ -38,7 +38,7 @@ public:
      *  upon access so generally does not need to be manually called.
      *  @return Database mutex object.
      */
-    static std::mutex* GetMutex();
+    static std::recursive_mutex* GetMutex();
 
     /**
      *  Destroy the singleton,
@@ -106,7 +106,7 @@ private:
     /// All sessions currently being tracked
     std::map<uint32_t, std::shared_ptr<LoginSession>> mmapSessions;
     /// Tracker access mutex
-    std::mutex mMutex;
+    std::recursive_mutex mMutex;
 };
 
 #endif

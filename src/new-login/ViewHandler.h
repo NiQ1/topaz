@@ -50,7 +50,7 @@ private:
     struct VIEW_CHAR_LIST_ENTRY {
         uint32_t dwCharacterID;     // 0-->3
         uint32_t dwContentID;       // 4-->7
-        uint32_t dwUnknown1;        // 8-->11       (0x00000001)
+        uint32_t dwEnabled;         // 8-->11       (0x00000001)
         char szCharacterName[16];   // 12-->27
         char szWorldName[16];       // 28-->43
         uint8_t cRace;              // 44
@@ -104,6 +104,11 @@ private:
      *  Send the accout character list to the client.
      */
     void SendCharacterList();
+
+    /**
+     *  Send the world list packet to the client.
+     */
+    void SendWorldList();
 
     /// FFXI Packet parser
     FFXIPacket mParser;

@@ -36,7 +36,7 @@ public:
      *  Gets the session mutex object. Lock this before doing any changes.
      *  @return Database mutex object.
      */
-    std::mutex* GetMutex();
+    std::recursive_mutex* GetMutex();
 
     /**
      *  Get the account ID associated with the session
@@ -245,7 +245,7 @@ private:
     // Whether character list has been loaded
     bool mbCharListLoaded = false;
     // Mutex for access sync
-    std::mutex mMutex;
+    std::recursive_mutex mMutex;
     // Requests to the data server
     std::queue<DATA_VIEW_REQUESTS> mRequestsToData;
     // Requests to the view server

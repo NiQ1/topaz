@@ -11,9 +11,10 @@
 #include <stdint.h>
 #include <mutex>
 #include <unordered_map>
+#include <memory>
 
  // Easy way to lock the config mutex
-#define LOCK_GLOBDATA std::lock_guard<std::mutex> l_globdata(*GlobalData::GetMutex())
+#define LOCK_GLOBDATA std::lock_guard<std::recursive_mutex> l_globdata(*GlobalData::GetMutex())
 
 class GlobalData;
 typedef GlobalData* GlobalDataPtr;
@@ -33,6 +34,30 @@ public:
     std::string GetWorldName(uint32_t dwWorldID);
 
     /**
+     *  Get a precompiled world list packet for administrators and
+     *  testers (which contains worlds marked as test).
+     *  @return Precompiled packet excluding FFXI headers
+     */
+    std::shared_ptr<uint8_t> GetAdminWorldsPacket();
+
+    /**
+     *  Get the size of the world list packet for administrators.
+     */
+    uint32_t GetAdminWorldsPacketSize();
+
+    /**
+     *  Get a precompiled world list packet for regular users.
+     *  This does not include any worlds marked at test.
+     *  @return Precompiled packet excluding FFXI headers
+     */
+    std::shared_ptr<uint8_t> GetUserWorldsPacket();
+
+    /**
+     *  Get the size of the world list packet for users.
+     */
+    uint32_t GetUserWorldsPacketSize();
+
+    /**
      *  Get an instance of the object. The object is created
      *  on the first call.
      */
@@ -43,7 +68,7 @@ public:
      *  any database access.
      *  @return Database mutex object.
      */
-    static std::mutex* GetMutex();
+    static std::recursive_mutex* GetMutex();
 
     /**
      *  Destroy and remove the current instance. Allows reloading of
@@ -109,7 +134,7 @@ private:
     /// Current object is already being destroyed
     static bool sbBeingDestroyed;
     /// Config access mutex
-    std::mutex mMutex;
+    std::recursive_mutex mMutex;
 };
 
 #endif
