@@ -333,6 +333,7 @@ void MQConnection::Run()
 
 void MQConnection::Send(uint8_t* bufData, uint32_t cbData)
 {
+    LOG_DEBUG0("Called.");
     amqp_basic_properties_t Properties = { 0 };
     Properties._flags = AMQP_BASIC_CONTENT_TYPE_FLAG;
     Properties.content_type = amqp_cstring_bytes("application/octet-stream");
@@ -350,10 +351,16 @@ void MQConnection::Send(uint8_t* bufData, uint32_t cbData)
         LOG_ERROR("Failed to publish message.");
         throw std::runtime_error("Publish failed.");
     }
+    LOG_DEBUG1("Published message.");
 }
 
 std::recursive_mutex* MQConnection::GetMutex()
 {
     LOG_DEBUG0("Called.");
     return &mMutex;
+}
+
+void MQConnection::HandleRequest(amqp_bytes_t Request)
+{
+    LOG_DEBUG0("Called.");
 }

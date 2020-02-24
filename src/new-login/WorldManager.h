@@ -59,6 +59,11 @@ public:
     uint32_t GetUserWorldsPacketSize();
 
     /**
+     *  Load the world list from the DB
+     */
+    void LoadWorlds();
+
+    /**
      *  Get an instance of the object. The object is created
      *  on the first call.
      */
@@ -124,10 +129,6 @@ private:
      */
     WorldManager();
 
-    /**
-     *  Load the world list from the DB
-     */
-    void LoadWorlds();
     /// World list packet for admins (contains test servers)
     std::shared_ptr<uint8_t> mbufWorldsPacketAdmin;
     /// Size of the admin world list packet

@@ -11,6 +11,7 @@
 #include "GlobalConfig.h"
 #include "ProtocolFactory.h"
 #include "SessionTracker.h"
+#include "WorldManager.h"
 
 #include <stdexcept>
 #include <thread>
@@ -117,6 +118,8 @@ void LoginServer::Run()
 		LOG_CRITICAL("Called without any listening socket.");
 		throw std::logic_error("Cannot run server without listening sockets.");
 	}
+    WorldManagerPtr WorldMgr = WorldManager::GetInstance();
+    WorldMgr->LoadWorlds();
 	mbRunning = true;
 	LOG_INFO("Server running.");
 	while (mbShutdown == false) {

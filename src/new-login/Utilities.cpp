@@ -50,20 +50,23 @@ std::string FormatString(const std::string* pstrFormat, ...)
     return strResult;
 }
 
-std::shared_ptr<uint8_t> IStreamToBuffer(std::istream& Stream, uint32_t dwMax, size_t* pdwSize)
+std::shared_ptr<uint8_t> IStreamToBuffer(std::istream* pStream, uint32_t dwMax, size_t* pdwSize)
 {
-    Stream.seekg(0, std::ios_base::end);
-    if (Stream.bad() || Stream.fail()) {
+    if (pStream == NULL) {
+        return NULL;
+    }
+    pStream->seekg(0, std::ios_base::end);
+    if (pStream->bad() || pStream->fail()) {
         LOG_ERROR("Cannot seek stream.");
         throw std::runtime_error("Stream seek failed.");
     }
-    size_t dwStreamSize = Stream.tellg();
-    if (Stream.bad() || Stream.fail()) {
+    size_t dwStreamSize = pStream->tellg();
+    if (pStream->bad() || pStream->fail()) {
         LOG_ERROR("Cannot tell stream.");
         throw std::runtime_error("Stream tell failed.");
     }
-    Stream.seekg(0, std::ios_base::beg);
-    if (Stream.bad() || Stream.fail()) {
+    pStream->seekg(0, std::ios_base::beg);
+    if (pStream->bad() || pStream->fail()) {
         LOG_ERROR("Cannot seek stream back.");
         throw std::runtime_error("Stream seek back failed.");
     }
@@ -73,8 +76,8 @@ std::shared_ptr<uint8_t> IStreamToBuffer(std::istream& Stream, uint32_t dwMax, s
     }
     uint8_t* bufOut = new uint8_t[dwStreamSize];
     memset(bufOut, 0, dwStreamSize);
-    Stream.read(reinterpret_cast<char*>(bufOut), dwStreamSize);
-    if (Stream.bad() || Stream.fail()) {
+    pStream->read(reinterpret_cast<char*>(bufOut), dwStreamSize);
+    if (pStream->bad() || pStream->fail()) {
         LOG_ERROR("Cannot read stream.");
         delete bufOut;
         throw std::runtime_error("Stream read failed.");

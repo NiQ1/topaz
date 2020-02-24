@@ -34,11 +34,11 @@ std::string FormatString(const std::string* pstrFormat, ...);
 /**
  *  Reads the entire value of an input stream and return it as a buffer
  *  shared pointer.
- *  @param Stream istream to read from
+ *  @param pStream istream to read from
  *  @param dwMax Max size to read in bytes
  *  @param pdwSize If not null receives the size of the data
  *  @return Pointer to the data
  */
-std::shared_ptr<uint8_t> IStreamToBuffer(std::istream& Stream, uint32_t dwMax, size_t* pdwSize = NULL);
+std::shared_ptr<uint8_t> IStreamToBuffer(std::istream* pStream, uint32_t dwMax, size_t* pdwSize = NULL);
 
 #endif

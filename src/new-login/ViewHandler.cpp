@@ -67,8 +67,8 @@ void ViewHandler::Run()
                     break;
                 }
                 // Nasty but needed trick to get the raw pointer
-                pPacketHeader = reinterpret_cast<FFXIPacket::FFXI_PACKET_HEADER*>(&(*pRawData));
-                pPayloadData = (&(*pRawData)) + sizeof(FFXIPacket::FFXI_PACKET_HEADER);
+                pPacketHeader = reinterpret_cast<FFXIPacket::FFXI_PACKET_HEADER*>(pRawData.get());
+                pPayloadData = pRawData.get() + sizeof(FFXIPacket::FFXI_PACKET_HEADER);
 
                 switch (pPacketHeader->dwPacketType) {
                 case FFXIPacket::FFXI_TYPE_GET_FEATURES:
@@ -218,6 +218,6 @@ void ViewHandler::SendWorldList()
         dwWorldListPacketSize = WorldMgr->GetUserWorldsPacketSize();
     }
     LOG_DEBUG1("Sending world list.");
-    mParser.SendPacket(FFXIPacket::FFXI_TYPE_WORLD_LIST, &(*pWorldListPacket), dwWorldListPacketSize);
+    mParser.SendPacket(FFXIPacket::FFXI_TYPE_WORLD_LIST, pWorldListPacket.get(), dwWorldListPacketSize);
     LOG_DEBUG1("World list sent.");
 }

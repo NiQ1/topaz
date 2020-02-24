@@ -150,14 +150,14 @@ void WorldManager::LoadWorlds()
     // consists of one unknown 4 byte header and then world list (4 byte world id, 15 byte world
     // name and 1 byte null terminator).
     mbufWorldsPacketAdmin = std::shared_ptr<uint8_t>(new uint8_t[sizeof(WORLD_PACKET_ENTRY) * dwNumWorlds + 4]);
-    *reinterpret_cast<uint32_t*>(&(*mbufWorldsPacketAdmin)) = 0x20;
-    WORLD_PACKET_ENTRY* pWorldsAdmin = reinterpret_cast<WORLD_PACKET_ENTRY*>((&(*mbufWorldsPacketAdmin)) + 4);
+    *reinterpret_cast<uint32_t*>(mbufWorldsPacketAdmin.get()) = 0x20;
+    WORLD_PACKET_ENTRY* pWorldsAdmin = reinterpret_cast<WORLD_PACKET_ENTRY*>((mbufWorldsPacketAdmin.get()) + 4);
     mdwWorldsPacketAdminSize = 4;
     // We don't know what will be the final size of this but it's guaranteed not to be longer
     // than the admin packet.
     mbufWorldsPacketUser = std::shared_ptr<uint8_t>(new uint8_t[sizeof(WORLD_PACKET_ENTRY) * dwNumWorlds + 4]);
-    *reinterpret_cast<uint32_t*>(&(*mbufWorldsPacketUser)) = 0x20;
-    WORLD_PACKET_ENTRY* pWorldsUser = reinterpret_cast<WORLD_PACKET_ENTRY*>((&(*mbufWorldsPacketUser)) + 4);
+    *reinterpret_cast<uint32_t*>(mbufWorldsPacketUser.get()) = 0x20;
+    WORLD_PACKET_ENTRY* pWorldsUser = reinterpret_cast<WORLD_PACKET_ENTRY*>(mbufWorldsPacketUser.get() + 4);
     mdwWorldsPacketUserSize = 4;
     uint32_t dwAdminWorlds = 0;
     uint32_t dwUserWorlds = 0;
@@ -170,14 +170,13 @@ void WorldManager::LoadWorlds()
         NewWorld.bMQUseSSL = pResultSet->get_boolean(4);
         NewWorld.bMQSSLVerifyCA = pResultSet->get_boolean(5);
         // 100KB for certs is way more than enough
-        NewWorld.pbufCACert = IStreamToBuffer(*pResultSet->get_blob(6), 102400, &NewWorld.cbCACert);
-        NewWorld.pbufClientCert = IStreamToBuffer(*pResultSet->get_blob(7), 102400, &NewWorld.cbClientCert);
-        NewWorld.pbufClientKey = IStreamToBuffer(*pResultSet->get_blob(8), 102400, &NewWorld.cbClientKey);
+        NewWorld.pbufCACert = IStreamToBuffer((pResultSet->get_blob(6)).get(), 102400, &NewWorld.cbCACert);
+        NewWorld.pbufClientCert = IStreamToBuffer((pResultSet->get_blob(7)).get(), 102400, &NewWorld.cbClientCert);
+        NewWorld.pbufClientKey = IStreamToBuffer((pResultSet->get_blob(8)).get(), 102400, &NewWorld.cbClientKey);
         strncpy(NewWorld.szUsername, pResultSet->get_string(9).c_str(), sizeof(NewWorld.szUsername) - 1);
         strncpy(NewWorld.szPassword, pResultSet->get_string(10).c_str(), sizeof(NewWorld.szPassword) - 1);
         strncpy(NewWorld.szVhost, pResultSet->get_string(11).c_str(), sizeof(NewWorld.szVhost) - 1);
         NewWorld.bIsTestWorld = pResultSet->get_boolean(12);
-        mmapWorldList[NewWorld.dwWorldId] = NewWorld;
         // Attempt to connect to MQ server
         try {
             NewWorld.pMQConn = std::shared_ptr<MQConnection>(new MQConnection(NewWorld.dwWorldId,
@@ -191,17 +190,19 @@ void WorldManager::LoadWorlds()
                 std::string(""),
                 NewWorld.bMQUseSSL,
                 NewWorld.bMQSSLVerifyCA,
-                &(*NewWorld.pbufCACert),
+                NewWorld.pbufCACert.get(),
                 NewWorld.cbCACert,
-                &(*NewWorld.pbufClientCert),
+                NewWorld.pbufClientCert.get(),
                 NewWorld.cbClientCert,
-                &(*NewWorld.pbufClientKey),
+                NewWorld.pbufClientKey.get(),
                 NewWorld.cbClientKey));
         }
         catch (std::exception&) {
             LOG_ERROR("Connection to world MQ failed, this world will be disabled.");
             continue;
         }
+        NewWorld.pMQConn->StartThread();
+        mmapWorldList[NewWorld.dwWorldId] = NewWorld;
         // Add to packets
         memset(pWorldsAdmin + dwAdminWorlds, 0, sizeof(WORLD_PACKET_ENTRY));
         pWorldsAdmin[dwAdminWorlds].dwWorldID = NewWorld.dwWorldId;
