@@ -11,11 +11,25 @@
 #include "TCPConnection.h"
 #include <stdexcept>
 #include <chrono>
+#include <openssl/ssl.h>
+#include <openssl/x509_vfy.h>
 
 #include <amqp_tcp_socket.h>
 #include <amqp_ssl_socket.h>
 
 #define LOCK_MQCONNECTION std::lock_guard<std::recursive_mutex> l_mqconnection(*GetMutex())
+
+// We need to mess around with this struct to load certificates directly from buffer
+struct amqp_ssl_socket_t {
+    const struct amqp_socket_class_t *klass;
+    SSL_CTX *ctx;
+    int sockfd;
+    SSL *ssl;
+    amqp_boolean_t verify_peer;
+    amqp_boolean_t verify_hostname;
+    int internal_error;
+};
+
 
 MQConnection::MQConnection(uint32_t dwWorldId,
     const std::string& strMqServer,
@@ -46,7 +60,129 @@ MQConnection::MQConnection(uint32_t dwWorldId,
     }
     mSocket = NULL;
     if (bUseSSL) {
+        // NOTE: Out certificates / private keys are stored as DB blobs. Since the AMQP library
+        // does not support reading certificates and keys from memory we'll need to use the
+        // underlying OpenSSL routines to do this. Ugly but needed.
+        LOG_DEBUG1("Using SSL for MQ connection.");
         mSocket = amqp_ssl_socket_new(mConnection);
+        amqp_boolean_t bVerify = (bVerifyPeer && (cbCACert > 0)) ? 1 : 0;
+        amqp_ssl_socket_set_verify_peer(mSocket, bVerify);
+        amqp_ssl_socket_set_verify_hostname(mSocket, bVerify);
+        if (bVerify) {
+            LOG_DEBUG1("Verify peer enabled, installing CA certificate.");
+            BIO* pBIO = BIO_new(BIO_s_mem());
+            if (!pBIO) {
+                LOG_ERROR("BIO allocation failed.");
+                throw std::runtime_error("BIO allocation failed.");
+            }
+            if (BIO_puts(pBIO, reinterpret_cast<const char*>(bufCACert)) != 1) {
+                BIO_free(pBIO);
+                LOG_ERROR("CA certificate read failed.");
+                throw std::runtime_error("CA Cert read failed.");
+            }
+            X509* pCert = PEM_read_bio_X509(pBIO, NULL, 0, NULL);
+            if (!pCert) {
+                BIO_free(pBIO);
+                LOG_ERROR("CA Cert X509 parse failed.");
+                throw std::runtime_error("CA X509 parse failed.");
+            }
+            struct amqp_ssl_socket_t* pSSLSocket = (struct amqp_ssl_socket_t *)mSocket;
+            X509_STORE* pSSLStore = SSL_CTX_get_cert_store(pSSLSocket->ctx);
+            if (!pSSLStore) {
+                BIO_free(pBIO);;
+                LOG_ERROR("Failed to obtain SSL store.");
+                throw std::runtime_error("Get SSL store failed.");
+            }
+            int result = X509_STORE_add_cert(pSSLStore, pCert);
+            BIO_free(pBIO);
+            if (result != 1) {
+                LOG_ERROR("Unable to install CA certificate.");
+                throw std::runtime_error("CA cert install failed.");
+            }
+            LOG_DEBUG1("CA certificate installed.");
+        }
+        if ((cbClientCert > 0) && (cbClientKey > 0)) {
+            LOG_DEBUG1("Client certificate provided, installing.");
+            struct amqp_ssl_socket_t* pSSLSocket = (struct amqp_ssl_socket_t *)mSocket;
+            BIO* pBIO = BIO_new(BIO_s_mem());
+            if (!pBIO) {
+                LOG_ERROR("Client cert BIO allocation failed.");
+                throw std::runtime_error("Client cert BIO allocation failed.");
+            }
+            if (BIO_puts(pBIO, reinterpret_cast<const char*>(bufClientCert)) != 1) {
+                BIO_free(pBIO);
+                LOG_ERROR("Client certificate read failed.");
+                throw std::runtime_error("Client Cert read failed.");
+            }
+            STACK_OF(X509_INFO)* pInfo = PEM_X509_INFO_read_bio(pBIO, NULL, NULL, NULL);
+            if (!pInfo) {
+                BIO_free(pBIO);
+                LOG_ERROR("CA Cert X509 parse failed.");
+                throw std::runtime_error("CA X509 parse failed.");
+            }
+            int iNumCerts = sk_X509_INFO_num(pInfo);
+            if (iNumCerts <= 0) {
+                sk_X509_INFO_pop_free(pInfo, X509_INFO_free);
+                BIO_free(pBIO);
+                LOG_ERROR("Invalid number of client certificates");
+                throw std::runtime_error("Client Cert number invalid.");
+            }
+            X509_INFO* pCurrentInfo = sk_X509_INFO_value(pInfo, 0);
+            if (!pCurrentInfo->x509) {
+                sk_X509_INFO_pop_free(pInfo, X509_INFO_free);
+                BIO_free(pBIO);
+                LOG_ERROR("Unable to parse client certificate");
+                throw std::runtime_error("Client Cert X509 parse failed.");
+            }
+            if (SSL_CTX_use_certificate(pSSLSocket->ctx, pCurrentInfo->x509) != 1) {
+                sk_X509_INFO_pop_free(pInfo, X509_INFO_free);
+                BIO_free(pBIO);
+                LOG_ERROR("Cannot use the given client certificate.");
+                throw std::runtime_error("Client Cert use failed.");
+            }
+            SSL_CTX_clear_chain_certs(pSSLSocket->ctx);
+            pCurrentInfo->x509 = NULL;
+            for (int i = 1; i < iNumCerts; i++) {
+                pCurrentInfo = sk_X509_INFO_value(pInfo, i);
+                if (!pCurrentInfo->x509) {
+                    LOG_WARNING("Invalid X509 certificate in chain, ignoring.");
+                    continue;
+                }
+                if (SSL_CTX_add0_chain_cert(pSSLSocket->ctx, pCurrentInfo->x509) != 1) {
+                    LOG_WARNING("Unable to add chain certificate, ignoring.");
+                    continue;
+                }
+                pCurrentInfo->x509 = NULL;
+            }
+            sk_X509_INFO_pop_free(pInfo, X509_INFO_free);
+            BIO_free(pBIO);
+            // Load private key
+            pBIO = BIO_new(BIO_s_mem());
+            if (!pBIO) {
+                LOG_ERROR("Client private key BIO allocation failed.");
+                throw std::runtime_error("Private key BIO allocation failed.");
+            }
+            if (BIO_puts(pBIO, reinterpret_cast<const char*>(bufClientKey)) != 1) {
+                BIO_free(pBIO);
+                LOG_ERROR("Private key read failed.");
+                throw std::runtime_error("Private key read failed.");
+            }
+            RSA* pKey = PEM_read_bio_RSAPrivateKey(pBIO, NULL, NULL, NULL);
+            if (!pKey) {
+                BIO_free(pBIO);
+                LOG_ERROR("Private key parse failed.");
+                throw std::runtime_error("Private key parse failed.");
+            }
+            if (SSL_CTX_use_RSAPrivateKey(pSSLSocket->ctx, pKey) != 1) {
+                RSA_free(pKey);
+                BIO_free(pBIO);
+                LOG_ERROR("Private key use failed.");
+                throw std::runtime_error("Private key use failed.");
+            }
+            RSA_free(pKey);
+            BIO_free(pBIO);
+            LOG_DEBUG1("Client certificate installed.");
+        }
     }
     else {
         mSocket = amqp_tcp_socket_new(mConnection);
