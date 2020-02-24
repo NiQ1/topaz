@@ -12,6 +12,9 @@
 #include "GlobalConfig.h"
 #include "Utilities.h"
 
+// Name of the login server queue
+#define LOGIN_MQ_NAME "LOGIN_MQ"
+
 WorldManagerPtr WorldManager::smpSingletonObj = NULL;
 bool WorldManager::sbBeingDestroyed = false;
 
@@ -139,8 +142,8 @@ void WorldManager::LoadWorlds()
     std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
         Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str()));
     mariadb::result_set_ref pResultSet = DB->query(strSqlFinalQuery);
-    uint32_t dwNumWorlds = pResultSet->row_count() == 0;
-    if (dwNumWorlds) {
+    uint32_t dwNumWorlds = static_cast<uint32_t>(pResultSet->row_count());
+    if (dwNumWorlds == 0) {
         LOG_CRITICAL("Failed to query the world list.");
         throw std::runtime_error("world list query failed.");
     }
@@ -186,8 +189,8 @@ void WorldManager::LoadWorlds()
                 std::string(NewWorld.szPassword),
                 std::string(NewWorld.szVhost),
                 std::string(""),
-                std::string("LOGIN_MQ"),
-                std::string(""),
+                std::string(LOGIN_MQ_NAME),
+                std::string(LOGIN_MQ_NAME),
                 NewWorld.bMQUseSSL,
                 NewWorld.bMQSSLVerifyCA,
                 NewWorld.pbufCACert.get(),

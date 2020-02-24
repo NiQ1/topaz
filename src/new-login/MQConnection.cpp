@@ -222,17 +222,19 @@ MQConnection::MQConnection(uint32_t dwWorldId,
         amqp_destroy_connection(mConnection);
         throw std::runtime_error("MQ queue declare error.");
     }
-    amqp_queue_bind(mConnection,
-        1,
-        amqp_cstring_bytes(strQueueName.c_str()),
-        amqp_cstring_bytes(strExchange.c_str()),
-        amqp_cstring_bytes(strRouteKey.c_str()),
-        amqp_empty_table);
-    if (amqp_get_rpc_reply(mConnection).reply_type != AMQP_RESPONSE_NORMAL) {
-        LOG_ERROR("Failed to bind queue to exchange.");
-        amqp_channel_close(mConnection, 1, AMQP_INTERNAL_ERROR);
-        amqp_destroy_connection(mConnection);
-        throw std::runtime_error("MQ queue bind error.");
+    if (!strExchange.empty()) {
+        amqp_queue_bind(mConnection,
+            1,
+            amqp_cstring_bytes(strQueueName.c_str()),
+            amqp_cstring_bytes(strExchange.c_str()),
+            amqp_cstring_bytes(strRouteKey.c_str()),
+            amqp_empty_table);
+        if (amqp_get_rpc_reply(mConnection).reply_type != AMQP_RESPONSE_NORMAL) {
+            LOG_ERROR("Failed to bind queue to exchange.");
+            amqp_channel_close(mConnection, 1, AMQP_INTERNAL_ERROR);
+            amqp_destroy_connection(mConnection);
+            throw std::runtime_error("MQ queue bind error.");
+        }
     }
     amqp_basic_consume(mConnection, 1, amqp_cstring_bytes(strQueueName.c_str()), amqp_empty_bytes, 0, 0, 0, amqp_empty_table);
     if (amqp_get_rpc_reply(mConnection).reply_type != AMQP_RESPONSE_NORMAL) {
@@ -264,6 +266,7 @@ void MQConnection::Run()
 
     LOG_DEBUG0("Called.");
     amqp_maybe_release_buffers(mConnection);
+    LOG_DEBUG1("MQ consumer started.");
 
     while (mbShutdown == false) {
         if (madwSendersWaiting != 0) {
@@ -329,11 +332,14 @@ void MQConnection::Run()
 
         amqp_maybe_release_buffers(mConnection);
     }
+    LOG_DEBUG1("MQ consumer finished.");
 }
 
 void MQConnection::Send(uint8_t* bufData, uint32_t cbData)
 {
     LOG_DEBUG0("Called.");
+    madwSendersWaiting++;
+    LOCK_MQCONNECTION;
     amqp_basic_properties_t Properties = { 0 };
     Properties._flags = AMQP_BASIC_CONTENT_TYPE_FLAG;
     Properties.content_type = amqp_cstring_bytes("application/octet-stream");
@@ -349,14 +355,15 @@ void MQConnection::Send(uint8_t* bufData, uint32_t cbData)
         &Properties,
         Message) != AMQP_STATUS_OK) {
         LOG_ERROR("Failed to publish message.");
+        madwSendersWaiting--;
         throw std::runtime_error("Publish failed.");
     }
+    madwSendersWaiting--;
     LOG_DEBUG1("Published message.");
 }
 
 std::recursive_mutex* MQConnection::GetMutex()
 {
-    LOG_DEBUG0("Called.");
     return &mMutex;
 }
 
