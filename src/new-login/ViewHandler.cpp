@@ -11,7 +11,7 @@
 #include "Debugging.h"
 #include "SessionTracker.h"
 #include "GlobalConfig.h"
-#include "GlobalData.h"
+#include "WorldManager.h"
 #include "Utilities.h"
 #include "Authentication.h"
 #include <time.h>
@@ -155,7 +155,7 @@ void ViewHandler::SendCharacterList()
     uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
     uint8_t cNumChars = min(mpSession->GetNumCharacters(), cNumCharsAllowed);
     const LoginSession::CHARACTER_ENTRY* pCurrentChar;
-    GlobalDataPtr GlobData = GlobalData::GetInstance();
+    WorldManagerPtr WorldMgr = WorldManager::GetInstance();
 
     CharListPacket.dwContentIds = mpSession->GetNumCharsAllowed();
     // Set the enabled bit on the allowed slots so the client knows it can
@@ -172,7 +172,7 @@ void ViewHandler::SendCharacterList()
         CharListPacket.CharList[i].dwContentID = pCurrentChar->dwCharacterID;
         CharListPacket.CharList[i].dwEnabled = 1;
         strncpy(CharListPacket.CharList[i].szCharacterName, pCurrentChar->szCharName, sizeof(CharListPacket.CharList[i].szCharacterName) - 1);
-        strncpy(CharListPacket.CharList[i].szWorldName, GlobData->GetWorldName(pCurrentChar->cWorldID).c_str(), sizeof(CharListPacket.CharList[i].szWorldName));
+        strncpy(CharListPacket.CharList[i].szWorldName, WorldMgr->GetWorldName(pCurrentChar->cWorldID).c_str(), sizeof(CharListPacket.CharList[i].szWorldName));
         CharListPacket.CharList[i].cRace = pCurrentChar->cRace;
         CharListPacket.CharList[i].cMainJob = pCurrentChar->cMainJob;
         CharListPacket.CharList[i].cFace = static_cast<uint8_t>(pCurrentChar->wFace);
@@ -200,7 +200,7 @@ void ViewHandler::SendCharacterList()
 void ViewHandler::SendWorldList()
 {
     LOG_DEBUG0("Called.");
-    GlobalDataPtr GlobData = GlobalData::GetInstance();
+    WorldManagerPtr WorldMgr = WorldManager::GetInstance();
 
     std::shared_ptr<uint8_t> pWorldListPacket;
     uint32_t dwWorldListPacketSize = 0;
@@ -208,14 +208,14 @@ void ViewHandler::SendWorldList()
     if ((mpSession->GetPrivilegesBitmask() & Authentication::ACCT_PRIV_HAS_TEST_ACCESS) != 0) {
         // User has test server access so they get the admin packet
         LOG_DEBUG1("User has test server access.");
-        pWorldListPacket = GlobData->GetAdminWorldsPacket();
-        dwWorldListPacketSize = GlobData->GetAdminWorldsPacketSize();
+        pWorldListPacket = WorldMgr->GetAdminWorldsPacket();
+        dwWorldListPacketSize = WorldMgr->GetAdminWorldsPacketSize();
     }
     else {
         // Just a regular boring user
         LOG_DEBUG1("User does not have test server access.");
-        pWorldListPacket = GlobData->GetUserWorldsPacket();
-        dwWorldListPacketSize = GlobData->GetUserWorldsPacketSize();
+        pWorldListPacket = WorldMgr->GetUserWorldsPacket();
+        dwWorldListPacketSize = WorldMgr->GetUserWorldsPacketSize();
     }
     LOG_DEBUG1("Sending world list.");
     mParser.SendPacket(FFXIPacket::FFXI_TYPE_WORLD_LIST, &(*pWorldListPacket), dwWorldListPacketSize);

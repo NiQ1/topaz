@@ -8,7 +8,7 @@
 #include "Debugging.h"
 #include "Database.h"
 #include "GlobalConfig.h"
-#include "GlobalData.h"
+#include "WorldManager.h"
 #include "LoginServer.h"
 #include "ProtocolFactory.h"
 #include "SessionTracker.h"
@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
 
     // Load global configuration
     GlobalConfigPtr Config = GlobalConfig::GetInstance();
-    GlobalDataPtr GlobData = GlobalData::GetInstance();
+    WorldManagerPtr WorldMgr = WorldManager::GetInstance();
     // Connect to database
     DatabasePtr DB = Database::Initialize(Config->GetConfigString("db_server").c_str(),
         Config->GetConfigUInt("db_port"),
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
     LoginServerInstance.Shutdown();
     SessionTracker::GetInstance()->Destroy();
     DB->Destroy();
-    GlobData->Destroy();
+    WorldMgr->Destroy();
     Config->Destroy();
 
     LOG_INFO("Shutdown complete.");

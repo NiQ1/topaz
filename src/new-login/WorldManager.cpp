@@ -1,42 +1,42 @@
 /**
- *	@file GlobalData.cpp
- *	Global data structures and objects
+ *	@file WorldManager.cpp
+ *	Manages world list and MQ connections to world servers
  *	@author Twilight
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#include "GlobalData.h"
+#include "WorldManager.h"
 #include "Debugging.h"
 #include <mariadb++/connection.hpp>
 #include "Database.h"
 #include "GlobalConfig.h"
 #include "Utilities.h"
 
-GlobalDataPtr GlobalData::smpSingletonObj = NULL;
-bool GlobalData::sbBeingDestroyed = false;
+WorldManagerPtr WorldManager::smpSingletonObj = NULL;
+bool WorldManager::sbBeingDestroyed = false;
 
-GlobalData::GlobalData() : mbWorldListLoaded(false)
+WorldManager::WorldManager() : mbWorldListLoaded(false)
 {
     LOG_DEBUG0("Called.");
 }
 
-GlobalData::~GlobalData()
+WorldManager::~WorldManager()
 {
     if (sbBeingDestroyed == false) {
         Destroy();
     }
 }
 
-GlobalDataPtr GlobalData::GetInstance()
+WorldManagerPtr WorldManager::GetInstance()
 {
     if (smpSingletonObj == NULL) {
-        smpSingletonObj = new GlobalData();
+        smpSingletonObj = new WorldManager();
     }
     return smpSingletonObj;
 }
 
 
-std::recursive_mutex* GlobalData::GetMutex()
+std::recursive_mutex* WorldManager::GetMutex()
 {
     LOG_DEBUG0("Called.");
     if (smpSingletonObj == NULL) {
@@ -46,7 +46,7 @@ std::recursive_mutex* GlobalData::GetMutex()
     return &smpSingletonObj->mMutex;
 }
 
-void GlobalData::Destroy()
+void WorldManager::Destroy()
 {
     LOG_DEBUG0("Called.");
     sbBeingDestroyed = true;
@@ -57,13 +57,13 @@ void GlobalData::Destroy()
     smpSingletonObj = NULL;
 }
 
-std::string GlobalData::GetWorldName(uint32_t dwWorldID)
+std::string WorldManager::GetWorldName(uint32_t dwWorldID)
 {
     if (!mbWorldListLoaded) {
         LOG_INFO("World list not loaded yet, trying to load now.");
         LoadWorlds();
     }
-    LOCK_GLOBDATA;
+    LOCK_WORLDMGR;
     auto WorldEnt = mmapWorldList.find(dwWorldID);
     if (WorldEnt != mmapWorldList.end()) {
         LOG_ERROR("World ID not found in list.");
@@ -72,47 +72,47 @@ std::string GlobalData::GetWorldName(uint32_t dwWorldID)
     return std::string(WorldEnt->second.szWorldName);
 }
 
-std::shared_ptr<uint8_t> GlobalData::GetAdminWorldsPacket()
+std::shared_ptr<uint8_t> WorldManager::GetAdminWorldsPacket()
 {
     if (!mbWorldListLoaded) {
         LOG_INFO("World list not loaded yet, trying to load now.");
         LoadWorlds();
     }
-    LOCK_GLOBDATA;
+    LOCK_WORLDMGR;
     return mbufWorldsPacketAdmin;
 }
 
-uint32_t GlobalData::GetAdminWorldsPacketSize()
+uint32_t WorldManager::GetAdminWorldsPacketSize()
 {
     if (!mbWorldListLoaded) {
         LOG_INFO("World list not loaded yet, trying to load now.");
         LoadWorlds();
     }
-    LOCK_GLOBDATA;
+    LOCK_WORLDMGR;
     return mdwWorldsPacketAdminSize;
 }
 
-std::shared_ptr<uint8_t> GlobalData::GetUserWorldsPacket()
+std::shared_ptr<uint8_t> WorldManager::GetUserWorldsPacket()
 {
     if (!mbWorldListLoaded) {
         LOG_INFO("World list not loaded yet, trying to load now.");
         LoadWorlds();
     }
-    LOCK_GLOBDATA;
+    LOCK_WORLDMGR;
     return mbufWorldsPacketUser;
 }
 
-uint32_t GlobalData::GetUserWorldsPacketSize()
+uint32_t WorldManager::GetUserWorldsPacketSize()
 {
     if (!mbWorldListLoaded) {
         LOG_INFO("World list not loaded yet, trying to load now.");
         LoadWorlds();
     }
-    LOCK_GLOBDATA;
+    LOCK_WORLDMGR;
     return mdwWorldsPacketUserSize;
 }
 
-void GlobalData::LoadWorlds()
+void WorldManager::LoadWorlds()
 {
     LOG_DEBUG0("Called.");
     if (mbWorldListLoaded) {
@@ -120,14 +120,16 @@ void GlobalData::LoadWorlds()
         return;
     }
 
-    LOCK_GLOBDATA;
+    LOCK_WORLDMGR;
 
     DBConnection DB = Database::GetDatabase();
     GlobalConfigPtr Config = GlobalConfig::GetInstance();
     LOCK_DB;
     LOCK_CONFIG;
 
-    std::string strSqlQueryFmt("SELECT id, name, mq_server_ip, mq_server_port, is_test FROM %sworlds WHERE is_active=1;");
+    std::string strSqlQueryFmt("SELECT id, name, mq_server_ip, mq_server_port, mq_use_ssl, "
+        "mq_ssl_verify_cert, mq_ssl_ca_cert, mq_ssl_client_cert, mq_ssl_client_key, "
+        "mq_username, mq_password, mq_vhost, is_test FROM %sworlds WHERE is_active=1;");
     std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
         Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str()));
     mariadb::result_set_ref pResultSet = DB->query(strSqlFinalQuery);
@@ -159,8 +161,41 @@ void GlobalData::LoadWorlds()
         strncpy(NewWorld.szWorldName, pResultSet->get_string(1).c_str(), sizeof(NewWorld.szWorldName) - 1);
         strncpy(NewWorld.szMQIP, pResultSet->get_string(2).c_str(), sizeof(NewWorld.szMQIP) - 1);
         NewWorld.wMQPort = static_cast<uint16_t>(pResultSet->get_unsigned32(3));
-        NewWorld.bIsTestWorld = pResultSet->get_boolean(4);
+        NewWorld.bMQUseSSL = pResultSet->get_boolean(4);
+        NewWorld.bMQSSLVerifyCA = pResultSet->get_boolean(5);
+        // 100KB for certs is way more than enough
+        NewWorld.pbufCACert = IStreamToBuffer(*pResultSet->get_blob(6), 102400, &NewWorld.cbCACert);
+        NewWorld.pbufClientCert = IStreamToBuffer(*pResultSet->get_blob(7), 102400, &NewWorld.cbClientCert);
+        NewWorld.pbufClientKey = IStreamToBuffer(*pResultSet->get_blob(8), 102400, &NewWorld.cbClientKey);
+        strncpy(NewWorld.szUsername, pResultSet->get_string(9).c_str(), sizeof(NewWorld.szUsername) - 1);
+        strncpy(NewWorld.szPassword, pResultSet->get_string(10).c_str(), sizeof(NewWorld.szPassword) - 1);
+        strncpy(NewWorld.szVhost, pResultSet->get_string(11).c_str(), sizeof(NewWorld.szVhost) - 1);
+        NewWorld.bIsTestWorld = pResultSet->get_boolean(12);
         mmapWorldList[NewWorld.dwWorldId] = NewWorld;
+        // Attempt to connect to MQ server
+        try {
+            NewWorld.pMQConn = std::shared_ptr<MQConnection>(new MQConnection(NewWorld.dwWorldId,
+                std::string(NewWorld.szMQIP),
+                NewWorld.wMQPort,
+                std::string(NewWorld.szUsername),
+                std::string(NewWorld.szPassword),
+                std::string(NewWorld.szVhost),
+                std::string(""),
+                std::string("LOGIN_MQ"),
+                std::string(""),
+                NewWorld.bMQUseSSL,
+                NewWorld.bMQSSLVerifyCA,
+                &(*NewWorld.pbufCACert),
+                NewWorld.cbCACert,
+                &(*NewWorld.pbufClientCert),
+                NewWorld.cbClientCert,
+                &(*NewWorld.pbufClientKey),
+                NewWorld.cbClientKey));
+        }
+        catch (std::exception&) {
+            LOG_ERROR("Connection to world MQ failed, this world will be disabled.");
+            continue;
+        }
         // Add to packets
         memset(pWorldsAdmin + dwAdminWorlds, 0, sizeof(WORLD_PACKET_ENTRY));
         pWorldsAdmin[dwAdminWorlds].dwWorldID = NewWorld.dwWorldId;

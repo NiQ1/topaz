@@ -34,7 +34,7 @@ public:
 
     /**
      *  Gets the session mutex object. Lock this before doing any changes.
-     *  @return Database mutex object.
+     *  @return Session mutex object.
      */
     std::recursive_mutex* GetMutex();
 

@@ -1,28 +1,29 @@
 /**
- *	@file GlobalData.h
- *	Global data structures and objects
+ *	@file WorldManager.h
+ *	Manages world list and MQ connections to world servers
  *	@author Twilight
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#ifndef FFXI_LOGIN_GLOBALDATA_H
-#define FFXI_LOGIN_GLOBALDATA_H
+#ifndef FFXI_LOGIN_WORLDMANAGER_H
+#define FFXI_LOGIN_WORLDMANAGER_H
 
 #include <stdint.h>
 #include <mutex>
 #include <unordered_map>
 #include <memory>
+#include "MQConnection.h"
 
- // Easy way to lock the config mutex
-#define LOCK_GLOBDATA std::lock_guard<std::recursive_mutex> l_globdata(*GlobalData::GetMutex())
+// Easy way to lock the config mutex
+#define LOCK_WORLDMGR std::lock_guard<std::recursive_mutex> l_worldmgr(*WorldManager::GetMutex())
 
-class GlobalData;
-typedef GlobalData* GlobalDataPtr;
+class WorldManager;
+typedef WorldManager* WorldManagerPtr;
 
 /**
- *  Singleton class for accessing global data.
+ *  Singleton class for accessing the world manager.
  */
-class GlobalData
+class WorldManager
 {
 public:
 
@@ -61,10 +62,10 @@ public:
      *  Get an instance of the object. The object is created
      *  on the first call.
      */
-    static GlobalDataPtr GetInstance();
+    static WorldManagerPtr GetInstance();
 
     /**
-     *  Gets the global database Mutex object. Lock this before
+     *  Gets the global data Mutex object. Lock this before
      *  any database access.
      *  @return Database mutex object.
      */
@@ -78,10 +79,9 @@ public:
     static void Destroy();
 
     /**
-     *  Destructor, closes the config file. Generally calling Destroy
-     *  explicitly is much safer.
+     *  Destructor. Generally calling Destroy explicitly is much safer.
      */
-    ~GlobalData();
+    ~WorldManager();
 
     /**
      *  Single world detail record.
@@ -92,7 +92,19 @@ public:
         char szWorldName[16];
         char szMQIP[40];
         uint16_t wMQPort;
+        bool bMQUseSSL;
+        bool bMQSSLVerifyCA;
+        std::shared_ptr<uint8_t> pbufCACert;
+        size_t cbCACert;
+        std::shared_ptr<uint8_t> pbufClientCert;
+        size_t cbClientCert;
+        std::shared_ptr<uint8_t> pbufClientKey;
+        size_t cbClientKey;
+        char szUsername[128];
+        char szPassword[128];
+        char szVhost[128];
         bool bIsTestWorld;
+        std::shared_ptr<MQConnection> pMQConn;
     };
 
 #pragma pack(push, 1)
@@ -110,7 +122,7 @@ private:
     /**
      *  Private constructor
      */
-    GlobalData();
+    WorldManager();
 
     /**
      *  Load the world list from the DB
@@ -130,7 +142,7 @@ private:
     bool mbWorldListLoaded = false;
     
     /// Current singleton object
-    static GlobalDataPtr smpSingletonObj;
+    static WorldManagerPtr smpSingletonObj;
     /// Current object is already being destroyed
     static bool sbBeingDestroyed;
     /// Config access mutex
