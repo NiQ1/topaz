@@ -53,6 +53,12 @@ void WorldManager::Destroy()
     if (smpSingletonObj == NULL) {
         return;
     }
+    // Disconnect from all MQ servers
+    while (smpSingletonObj->mmapWorldList.size()) {
+        std::unordered_map<uint32_t, WORLD_ENTRY>::iterator it = smpSingletonObj->mmapWorldList.begin();
+        it->second.pMQConn->Shutdown();
+        smpSingletonObj->mmapWorldList.erase(it->first);
+    }
     delete smpSingletonObj;
     smpSingletonObj = NULL;
 }
