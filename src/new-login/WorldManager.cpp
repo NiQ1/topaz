@@ -228,3 +228,8 @@ void WorldManager::LoadWorlds()
     }
     mbWorldListLoaded = true;
 }
+
+void WorldManager::SendMessageToWorld(uint32_t dwWorldID, const uint8_t* bufMessage, uint32_t cbMessage)
+{
+    mmapWorldList[dwWorldID].pMQConn->Send(bufMessage, cbMessage);
+}

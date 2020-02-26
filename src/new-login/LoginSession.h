@@ -8,6 +8,7 @@
 #ifndef FFXI_LOGIN_LOGINSESSION_H
 #define FFXI_LOGIN_LOGINSESSION_H
 
+#include "CharMessageHnd.h"
 #include <stdint.h>
 #include <time.h>
 #include <mutex>
@@ -105,6 +106,12 @@ public:
     uint32_t GetPrivilegesBitmask() const;
 
     /**
+     *  Get the user's client version
+     *  @return Client version (as sent by the client)
+     */
+    std::string GetClientVersion() const;
+
+    /**
      *  Set the encryption key for this session.
      *  @param bufKey 24 byte long key buffer
      */
@@ -148,30 +155,10 @@ public:
     void SetPrivilegesBitmask(uint32_t dwPrivileges);
 
     /**
-     *  A single entry in the account character list
+     *  Set the user's client version.
+     *  @param strClientVersion The user client version
      */
-    struct CHARACTER_ENTRY
-    {
-        // Always zero, doesn't seem to have any meaning
-        uint32_t dwCharacterID;
-        char szCharName[16];
-        uint32_t dwAccountID;
-        uint8_t cWorldID;
-        uint8_t cMainJob;
-        uint8_t cMainJobLevel;
-        uint16_t wZone;
-        uint8_t cRace;
-        uint16_t wFace;
-        // Whatever the char was wearing when last logged-out
-        uint16_t wHead;
-        uint16_t wBody;
-        uint16_t wHands;
-        uint16_t wLegs;
-        uint16_t wFeet;
-        // Equipped weapons, not jobs
-        uint16_t wMain;
-        uint16_t wSub;
-    };
+    void SetClientVersion(std::string& strClientVersion);
 
     /**
      *  Load the character list from the DB
@@ -183,7 +170,7 @@ public:
      *  @param cOffset Offset in the character list
      *  @return Character entry struct with character data
      */
-    const CHARACTER_ENTRY* GetCharacter(uint8_t cOffset);
+    const CharMessageHnd::CHARACTER_ENTRY* GetCharacter(uint8_t cOffset);
 
     /**
      *  List of requests that go between the data and view servers.
@@ -226,6 +213,8 @@ private:
     uint32_t mdwIpAddr;
     // Initial key to be sent to the map server
     uint8_t mbufInitialKey[24];
+    // Whether the key has been installed
+    bool mbKeyInstalled;
     // When the session expires and auto-removed
     time_t mtmExpires;
     // Whether to ignore this packet when doing IP lookups
@@ -240,8 +229,10 @@ private:
     uint32_t mdwFeaturesBitmask;
     // Account privileges bitmask
     uint32_t mdwPrivilegesBitmask;
+    // Client version
+    std::string mstrClientVersion;
     // Character data list
-    CHARACTER_ENTRY mCharacters[16];
+    CharMessageHnd::CHARACTER_ENTRY mCharacters[16];
     // Whether character list has been loaded
     bool mbCharListLoaded = false;
     // Mutex for access sync

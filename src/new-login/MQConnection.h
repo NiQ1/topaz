@@ -9,9 +9,11 @@
 #define FFXI_LOGIN_MQCONNECTION_H
 
 #include "Thread.h"
+#include "MQHandler.h"
 #include <amqp.h>
 #include <mutex>
 #include <atomic>
+#include <vector>
 
 /**
  *  Represents a single connection to a MQ server for a single world
@@ -61,6 +63,20 @@ public:
     ~MQConnection();
 
     /**
+     *  Get the World ID associated with this connection
+     *  @return World ID
+     */
+    uint32_t GetWorldId() const;
+
+    /**
+     *  Assign a new handler to the connection. When a message is received
+     *  all handlers will be called until one function returns a true value,
+     *  in which case the iteration is stopped.
+     *  @param pNewHandler New handler to register
+     */
+    void AssignHandler(std::shared_ptr<MQHandler> pNewHandler);
+
+    /**
      *  Gets the session mutex object. Lock this before doing any changes.
      *  @return MQ Connection mutex object.
      */
@@ -76,7 +92,7 @@ public:
      *  @param bufData Data buffer to send
      *  @param cbData Size of the data in bytes
      */
-    void Send(uint8_t* bufData, uint32_t cbData);
+    void Send(const uint8_t* bufData, uint32_t cbData);
 
     /**
      *  Message type codes for messages going between login and map servers
@@ -89,7 +105,7 @@ public:
         // Full update of character details
         MQ_MESSAGE_CHAR_UPDATE = 2,
         // Character is about to log-in
-        MQ_MESSAGE_CHAR_LOGIN_ = 3,
+        MQ_MESSAGE_CHAR_LOGIN = 3,
         // Map server acknowleges character login
         MQ_MESSAGE_CHAR_LOGIN_ACK = 4,
         // Character changed zone notification
@@ -116,12 +132,8 @@ public:
 
 private:
 
-    /**
-     *  Handles incoming requests.
-     *  @param Request The MQ request bytes.
-     */
-    void HandleRequest(amqp_bytes_t Request);
-
+    /// World ID associated with this connection
+    uint32_t mdwWorldId;
     /// Internal handles used by the AMQP library to identify the connection
     amqp_connection_state_t mConnection;
     amqp_socket_t* mSocket;
@@ -131,6 +143,8 @@ private:
     std::string mstrExchange;
     // Routing key for this session
     std::string mstrRouteKey;
+    /// List of message handlers registered with this connection
+    std::vector<std::shared_ptr<MQHandler>> mpHandlers;
 
     // Mutex for access sync
     std::recursive_mutex mMutex;

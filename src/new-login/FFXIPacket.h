@@ -89,6 +89,14 @@ public:
      */
     enum FFXI_ERROR_CODES
     {
+        // Unable to connect to world server
+        FFXI_ERROR_MAP_CONNECT_FAILED = 305,
+        // Character name already taken
+        FFXI_ERROR_NAME_ALREADY_TAKEN = 313,
+        // Character creation not allowed
+        FFXI_ERROR_CREATE_DENIED = 314,
+        // Log-in not allowed (maintenance mode)
+        FFXI_ERROR_LOGIN_DENIED = 321,
         // The server does not support this client version
         FFXI_ERROR_VERSION_MISMATCH = 331
     };

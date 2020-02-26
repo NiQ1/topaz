@@ -35,6 +35,14 @@ public:
     std::string GetWorldName(uint32_t dwWorldID);
 
     /**
+     *  Send a message to the MQ server of a world given its ID
+     *  @param dwWorldID World ID of the target world
+     *  @param bufMessage Message to send
+     *  @param cbMessage Message size in bytes
+     */
+    void SendMessageToWorld(uint32_t dwWorldID, const uint8_t* bufMessage, uint32_t cbMessage);
+
+    /**
      *  Get a precompiled world list packet for administrators and
      *  testers (which contains worlds marked as test).
      *  @return Precompiled packet excluding FFXI headers

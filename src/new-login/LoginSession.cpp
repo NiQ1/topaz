@@ -18,6 +18,7 @@
 LoginSession::LoginSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL) :
     mdwAccountId(dwAccountId),
     mdwIpAddr(dwIpAddr),
+    mbKeyInstalled(false),
     mbIgnoreOnIPLookup(false),
     mcNumCharacters(0),
     mcNumCharsAllowed(0),
@@ -54,6 +55,10 @@ uint32_t LoginSession::GetClientIPAddress() const
 
 const uint8_t* LoginSession::GetKey() const
 {
+    if (mbKeyInstalled == false) {
+        LOG_ERROR("Attempted to get the session key before setting it.");
+        throw std::runtime_error("Session key not installed.");
+    }
     return mbufInitialKey;
 }
 
@@ -90,7 +95,7 @@ uint8_t LoginSession::GetNumCharsAllowed() const
     return mcNumCharsAllowed;
 }
 
-const LoginSession::CHARACTER_ENTRY* LoginSession::GetCharacter(uint8_t cOffset)
+const CharMessageHnd::CHARACTER_ENTRY* LoginSession::GetCharacter(uint8_t cOffset)
 {
     if (!mbCharListLoaded) {
         LOG_ERROR("Attempted to access character data before loading from DB.");
@@ -99,9 +104,15 @@ const LoginSession::CHARACTER_ENTRY* LoginSession::GetCharacter(uint8_t cOffset)
     return mCharacters + cOffset;
 }
 
+std::string LoginSession::GetClientVersion() const
+{
+    return mstrClientVersion;
+}
+
 void LoginSession::SetKey(const uint8_t* bufKey)
 {
     memcpy(mbufInitialKey, bufKey, sizeof(mbufInitialKey));
+    mbKeyInstalled = true;
 }
 
 void LoginSession::SetExpiryTimeAbsolute(time_t tmNewTime)
@@ -152,6 +163,11 @@ void LoginSession::SetPrivilegesBitmask(uint32_t dwPrivileges)
     mdwFeaturesBitmask = dwPrivileges;
 }
 
+void LoginSession::SetClientVersion(std::string& strClientVersion)
+{
+    mstrClientVersion = strClientVersion;
+}
+
 void LoginSession::LoadCharacterList()
 {
     LOG_DEBUG0("Called.");
@@ -179,11 +195,11 @@ void LoginSession::LoadCharacterList()
     }
     pResultSet->next();
     mcNumCharsAllowed = static_cast<uint8_t>(pResultSet->get_unsigned32(0));
-    CHARACTER_ENTRY CharList[16];
+    CharMessageHnd::CHARACTER_ENTRY CharList[16];
     memset(&CharList, 0, sizeof(CharList));
     strSqlQueryFmt = "SELECT id, name, account_id, world_id, main_job, main_job_lv, "
         "zone, race, face, head, body, hands, legs, feet, main, sub "
-        "FROM %schars WHERE account_id=%d LIMIT %u;";
+        "FROM %schars WHERE account_id=%d ORDER BY id LIMIT %u;";
     strSqlFinalQuery = FormatString(&strSqlQueryFmt,
         Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
         mdwAccountId, static_cast<uint32_t>(mcNumCharsAllowed));

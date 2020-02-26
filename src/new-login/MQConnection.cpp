@@ -47,7 +47,7 @@ MQConnection::MQConnection(uint32_t dwWorldId,
     const uint8_t* bufClientCert,
     size_t cbClientCert,
     const uint8_t* bufClientKey,
-    size_t cbClientKey)
+    size_t cbClientKey) : mdwWorldId(dwWorldId)
 {
     LOG_DEBUG0("Called.");
     madwSendersWaiting = 0;
@@ -263,6 +263,8 @@ void MQConnection::Run()
     amqp_frame_t Frame;
     amqp_message_t Message;
     struct timeval tv = { 0, 1000 };
+    size_t dwNumHandlers = 0;
+    size_t i = 0;
 
     LOG_DEBUG0("Called.");
     amqp_maybe_release_buffers(mConnection);
@@ -276,8 +278,14 @@ void MQConnection::Run()
         LOCK_MQCONNECTION;
 
         Response = amqp_consume_message(mConnection, &Envelope, &tv, 0);
-        if (Response.reply_type == AMQP_RESPONSE_NORMAL) {LOG_DEBUG1("Received message.");
-            HandleRequest(Envelope.message.body);
+        if (Response.reply_type == AMQP_RESPONSE_NORMAL) {
+            LOG_DEBUG1("Received message.");
+            dwNumHandlers = mpHandlers.size();
+            for (i = 0; i < dwNumHandlers; i++) {
+                if (mpHandlers[i]->HandleRequest(Envelope.message.body, this)) {
+                    break;
+                }
+            }
         }
         else if (Response.reply_type == AMQP_RESPONSE_LIBRARY_EXCEPTION) {
             if (Response.library_error == AMQP_STATUS_TIMEOUT) {
@@ -335,7 +343,7 @@ void MQConnection::Run()
     LOG_DEBUG1("MQ consumer finished.");
 }
 
-void MQConnection::Send(uint8_t* bufData, uint32_t cbData)
+void MQConnection::Send(const uint8_t* bufData, uint32_t cbData)
 {
     LOG_DEBUG0("Called.");
     madwSendersWaiting++;
@@ -345,7 +353,9 @@ void MQConnection::Send(uint8_t* bufData, uint32_t cbData)
     Properties.content_type = amqp_cstring_bytes("application/octet-stream");
     amqp_bytes_t Message;
     Message.len = cbData;
-    Message.bytes = bufData;
+    // Unfortunately this is needed (we don't want to modify external libs)
+    // amqp_basic_publish is not expected to touch the buffer anyway.
+    Message.bytes = const_cast<uint8_t*>(bufData);
     if (amqp_basic_publish(mConnection,
         1,
         amqp_cstring_bytes(mstrExchange.c_str()),
@@ -367,7 +377,12 @@ std::recursive_mutex* MQConnection::GetMutex()
     return &mMutex;
 }
 
-void MQConnection::HandleRequest(amqp_bytes_t Request)
+uint32_t MQConnection::GetWorldId() const
 {
-    LOG_DEBUG0("Called.");
+    return mdwWorldId;
+}
+
+void MQConnection::AssignHandler(std::shared_ptr<MQHandler> pNewHandler)
+{
+    mpHandlers.push_back(pNewHandler);
 }

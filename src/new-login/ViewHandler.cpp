@@ -16,9 +16,14 @@
 #include "Authentication.h"
 #include <time.h>
 
+// Timeout for key installation (milliseconds)
+#define KEY_INSTALLATION_TIMEOUT 10000
+// Timeout for response from world server (seconds)
+#define WORLD_SERVER_REPLY_TIMEOUT 10
+
 #define LOCK_SESSION std::lock_guard<std::recursive_mutex> l_session(*mpSession->GetMutex())
 
-ViewHandler::ViewHandler(std::shared_ptr<TCPConnection> connection) : ProtocolHandler(connection), mParser(connection)
+ViewHandler::ViewHandler(std::shared_ptr<TCPConnection> connection) : ProtocolHandler(connection), mParser(connection), mtmOperationTimeout(0)
 {
     LOG_DEBUG0("Called.");
 }
@@ -80,6 +85,9 @@ void ViewHandler::Run()
                 case FFXIPacket::FFXI_TYPE_GET_WORLD_LIST:
                     SendWorldList();
                     break;
+                case FFXIPacket::FFXI_TYPE_LOGIN_REQUEST:
+                    HandleLoginRequest(reinterpret_cast<LOGIN_REQUEST_PACKET*>(pPayloadData));
+                    break;
                 }
             }
         }
@@ -91,12 +99,12 @@ void ViewHandler::Run()
     mpConnection->Close();
 }
 
-void ViewHandler::CheckVersionAndSendFeatures(uint8_t* pRequestPacket)
+void ViewHandler::CheckVersionAndSendFeatures(const uint8_t* pRequestPacket)
 {
     LOG_DEBUG0("Called.");
     // The packet has a lot of unidentified garbage, the only thing that is of
     // interest to us is the version number, which is at offset 88
-    std::string strClientVersion(reinterpret_cast<char*>(pRequestPacket + 88), 10);
+    std::string strClientVersion(reinterpret_cast<const char*>(pRequestPacket + 88), 10);
     LOG_DEBUG1("Client version: %s", strClientVersion.c_str());
     GlobalConfigPtr Config = GlobalConfig::GetInstance();
     uint32_t dwVersionLock = Config->GetConfigUInt("version_lock");
@@ -121,6 +129,7 @@ void ViewHandler::CheckVersionAndSendFeatures(uint8_t* pRequestPacket)
     DBConnection DB = Database::GetDatabase();
     LOCK_DB;
     LOCK_SESSION;
+    mpSession->SetClientVersion(strClientVersion);
     // Pull features and expansions bitmask from DB
     std::string strSqlQueryFmt("SELECT expansions, features FROM %saccounts WHERE id=%d;");
     std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt, 
@@ -154,7 +163,7 @@ void ViewHandler::SendCharacterList()
     mpSession->LoadCharacterList();
     uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
     uint8_t cNumChars = min(mpSession->GetNumCharacters(), cNumCharsAllowed);
-    const LoginSession::CHARACTER_ENTRY* pCurrentChar;
+    const CharMessageHnd::CHARACTER_ENTRY* pCurrentChar;
     WorldManagerPtr WorldMgr = WorldManager::GetInstance();
 
     CharListPacket.dwContentIds = mpSession->GetNumCharsAllowed();
@@ -166,10 +175,13 @@ void ViewHandler::SendCharacterList()
         // (Will be overwritten later for characters that do exist).
         CharListPacket.CharList[i].szCharacterName[0] = ' ';
     }
+    // Max content IDs per account is 16, so this guarantees that no two accounts
+    // will have overlapping content ids.
+    uint32_t dwBaseContentID = mpSession->GetAccountID() * 16;
     for (uint8_t i = 0; i < cNumChars; i++) {
         pCurrentChar = mpSession->GetCharacter(i);
+        CharListPacket.CharList[i].dwContentID = dwBaseContentID + i;
         CharListPacket.CharList[i].dwCharacterID = pCurrentChar->dwCharacterID;
-        CharListPacket.CharList[i].dwContentID = pCurrentChar->dwCharacterID;
         CharListPacket.CharList[i].dwEnabled = 1;
         strncpy(CharListPacket.CharList[i].szCharacterName, pCurrentChar->szCharName, sizeof(CharListPacket.CharList[i].szCharacterName) - 1);
         strncpy(CharListPacket.CharList[i].szWorldName, WorldMgr->GetWorldName(pCurrentChar->cWorldID).c_str(), sizeof(CharListPacket.CharList[i].szWorldName));
@@ -220,4 +232,65 @@ void ViewHandler::SendWorldList()
     LOG_DEBUG1("Sending world list.");
     mParser.SendPacket(FFXIPacket::FFXI_TYPE_WORLD_LIST, pWorldListPacket.get(), dwWorldListPacketSize);
     LOG_DEBUG1("World list sent.");
+}
+
+void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
+{
+    // Retry count for key installation
+    uint32_t dwKeyRetryCount = 0;
+    // Session key
+    const uint8_t* bufKey = NULL;
+
+    // Backup the packet, as it will be needed in the second phase
+    memcpy(&mLastLoginRequestPacket, pRequestPacket, sizeof(mLastLoginRequestPacket));
+
+    // Wait for key installation if needed
+    while ((bufKey == NULL) && (dwKeyRetryCount < KEY_INSTALLATION_TIMEOUT) && (mbShutdown == false)) {
+        try {
+            bufKey = mpSession->GetKey();
+        }
+        catch (std::runtime_error) {
+            dwKeyRetryCount++;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+    if (bufKey == NULL) {
+        // Timed out waiting for client key
+        // TODO: Check whether there's a more suitable error code.
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+    }
+    LOCK_SESSION;
+    // Notify the world server that a character wants to log in
+    CharMessageHnd::MESSAGE_LOGIN_REQUEST LoginMessage;
+    LoginMessage.eType = MQConnection::MQ_MESSAGE_CHAR_LOGIN;
+    LoginMessage.dwCharacterID = pRequestPacket->dwCharacterID;
+    memcpy(&LoginMessage.bufInitialKey, bufKey, sizeof(LoginMessage.bufInitialKey));
+    LoginMessage.dwAccountID = mpSession->GetAccountID();
+    LoginMessage.dwExpansions = mpSession->GetExpansionsBitmask();
+    LoginMessage.dwFeatures = mpSession->GetFeaturesBitmask();
+    // The client chops the character ID to uint16 (apparently this also happens on retail)
+    // so we'll need to iterate the account characters and look for the complete character ID.
+    // this should work unless the user has two characters in two different worlds with the
+    // same name and that somehow share the same 2 lower level bytes of their character ID
+    // (extremely unlikely).
+    uint8_t cNumChars = mpSession->GetNumCharacters();
+    const CharMessageHnd::CHARACTER_ENTRY* pCurrentChar = NULL;
+    for (uint8_t i = 0; i < cNumChars; i++) {
+        pCurrentChar = mpSession->GetCharacter(i);
+        if (pCurrentChar == NULL) {
+            LOG_ERROR("Get character returned NULL pointer.");
+            throw std::runtime_error("Get character failed.");
+        }
+        if ((pCurrentChar->dwCharacterID % 0x10000 == pRequestPacket->dwCharacterID) &&
+            (strncmp(pCurrentChar->szCharName, pRequestPacket->szCharacterName, sizeof(pCurrentChar->szCharName)) == 0)) {
+            LoginMessage.dwCharacterID = pCurrentChar->dwCharacterID;
+            break;
+        }
+    }
+    LOCK_WORLDMGR;
+    WorldManager::GetInstance()->SendMessageToWorld(pCurrentChar->cWorldID, reinterpret_cast<uint8_t*>(&LoginMessage), sizeof(LoginMessage));
+    // We're stopping here and waiting for the world server to reply through the MQ, which will
+    // continue the login process. Set a timeout so if the world server is down we don't keep
+    // the client waiting forever.
+    mtmOperationTimeout = time(NULL) + WORLD_SERVER_REPLY_TIMEOUT;
 }

@@ -48,8 +48,8 @@ private:
      *  Entry of a character in the character list packet
      */
     struct VIEW_CHAR_LIST_ENTRY {
-        uint32_t dwCharacterID;     // 0-->3
-        uint32_t dwContentID;       // 4-->7
+        uint32_t dwContentID;       // 0-->3
+        uint32_t dwCharacterID;     // 4-->7
         uint32_t dwEnabled;         // 8-->11       (0x00000001)
         char szCharacterName[16];   // 12-->27
         char szWorldName[16];       // 28-->43
@@ -92,13 +92,43 @@ private:
         uint32_t dwFeatures;
     };
 
+    /**
+     *  Server confirms login request
+     */
+    struct LOGIN_CONFIRM_PACKET
+    {
+        uint32_t dwContentID;
+        uint32_t dwCharacterID;
+        char szCharacterName[16];
+        uint32_t dwUnknown; // Seems to always be 0x00000002
+        uint32_t dwZoneIP;
+        uint16_t wZonePort; // Network byte order
+        uint16_t wZero1; // Seems to be little endian
+        uint32_t wSearchIP;
+        uint16_t wSearchPort;
+        uint16_t wZero2;
+    };
+
+    /**
+     *  Client requests to log-in
+     */
+    struct LOGIN_REQUEST_PACKET
+    {
+        uint32_t dwContentID;
+        uint32_t dwCharacterID;
+        char szCharacterName[16];
+        uint8_t bufUnknown1[16];
+        uint32_t dwUnknown2; // Seems to always be 0x00000003
+        uint8_t bufUnknown3[16];
+    };
+
 #pragma pack(pop)
 
     /**
      *  Check the client version and send back a list of features
      *  @param pRequestPacket The payload of the request packet
      */
-    void CheckVersionAndSendFeatures(uint8_t* pRequestPacket);
+    void CheckVersionAndSendFeatures(const uint8_t* pRequestPacket);
 
     /**
      *  Send the accout character list to the client.
@@ -110,10 +140,20 @@ private:
      */
     void SendWorldList();
 
+    /**
+     *  Handle a character login request (first phase).
+     *  @param pRequestPacket Login request packet without headers
+     */
+    void HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket);
+
     /// FFXI Packet parser
     FFXIPacket mParser;
     /// Associated session
     std::shared_ptr<LoginSession> mpSession;
+    /// Last login request packet received
+    LOGIN_REQUEST_PACKET mLastLoginRequestPacket;
+    /// Timeout for the current wait operation
+    time_t mtmOperationTimeout;
 };
 
 #endif
