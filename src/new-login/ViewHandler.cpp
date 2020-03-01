@@ -18,12 +18,18 @@
 
 // Timeout for key installation (milliseconds)
 #define KEY_INSTALLATION_TIMEOUT 10000
+// Timeout for character list installation by bootloader
+#define CHAR_LIST_INSTALLATION_TIMEOUT 10000
 // Timeout for response from world server (seconds)
 #define WORLD_SERVER_REPLY_TIMEOUT 10
 
 #define LOCK_SESSION std::lock_guard<std::recursive_mutex> l_session(*mpSession->GetMutex())
 
-ViewHandler::ViewHandler(std::shared_ptr<TCPConnection> connection) : ProtocolHandler(connection), mParser(connection), mtmOperationTimeout(0)
+ViewHandler::ViewHandler(std::shared_ptr<TCPConnection> connection) : ProtocolHandler(connection),
+    mParser(connection),
+    mtmOperationTimeout(0),
+    mbReceivedSendCharListClient(false),
+    mbReceivedSendCharListDataSrv(false)
 {
     LOG_DEBUG0("Called.");
 }
@@ -59,6 +65,9 @@ void ViewHandler::Run()
     std::shared_ptr<uint8_t> pRawData;
     FFXIPacket::FFXI_PACKET_HEADER* pPacketHeader = NULL;
     uint8_t* pPayloadData = NULL;
+    LoginSession::REQUESTS_TO_VIEW_SERVER RequestFromData = LoginSession::VIEW_SERVER_IDLE;
+    std::shared_ptr<uint8_t> pMessageFromMQ;
+
     try {
         while (mbShutdown == false) {
 
@@ -80,7 +89,12 @@ void ViewHandler::Run()
                     CheckVersionAndSendFeatures(pPayloadData);
                     break;
                 case FFXIPacket::FFXI_TYPE_GET_CHARACTER_LIST:
-                    SendCharacterList();
+                    // Make sure the data server has already installed the character list,
+                    // otherwise wait for it.
+                    mbReceivedSendCharListClient = true;
+                    if (mbReceivedSendCharListDataSrv) {
+                        SendCharacterList();
+                    }
                     break;
                 case FFXIPacket::FFXI_TYPE_GET_WORLD_LIST:
                     SendWorldList();
@@ -90,12 +104,50 @@ void ViewHandler::Run()
                     break;
                 }
             }
+
+            // Check if the data server wants us to do something
+            RequestFromData = mpSession->GetRequestFromDataServer();
+            if (RequestFromData != LoginSession::VIEW_SERVER_IDLE) {
+                switch (RequestFromData) {
+                case LoginSession::VIEW_SERVER_SEND_CHARACTER_LIST:
+                    mbReceivedSendCharListDataSrv = true;
+                    if (mbReceivedSendCharListClient) {
+                        // Only send the character list if the client requested it
+                        SendCharacterList();
+                    }
+                    break;
+                case LoginSession::VIEW_SERVER_PROCEED_LOGIN:
+                    HandleLoginRequest(&mLastLoginRequestPacket);
+                    break;
+                default:
+                    LOG_ERROR("View server in invalid state.");
+                    throw std::runtime_error("View server in invalid state.");
+                }
+                mpSession->SendRequestToViewServer(LoginSession::VIEW_SERVER_IDLE);
+            }
+
+            // Maybe we have a message waiting from MQ
+            pMessageFromMQ = mpSession->GetMessageFromMQ();
+            if (pMessageFromMQ != NULL) {
+                switch (*reinterpret_cast<MQConnection::MQ_MESSAGE_TYPES*>(pMessageFromMQ.get())) {
+                case MQConnection::MQ_MESSAGE_CHAR_LOGIN_ACK:
+                    CompleteLoginRequest(pMessageFromMQ);
+                    break;
+                default:
+                    LOG_ERROR("Invalid message received from world server.");
+                    throw std::runtime_error("MQ message type unknown.");
+                }
+            }
         }
     }
     catch (...) {
         LOG_ERROR("Exception thown by view server, disconnecting client.");
     }
 
+    mpSession->SetViewServerFinished();
+    if (mpSession->IsDataServerFinished()) {
+        mpSession->SetExpiryTimeAbsolute(0);
+    }
     mpConnection->Close();
 }
 
@@ -156,8 +208,8 @@ void ViewHandler::CheckVersionAndSendFeatures(const uint8_t* pRequestPacket)
 void ViewHandler::SendCharacterList()
 {
     LOG_DEBUG0("Called.");
-    LOCK_SESSION;
 
+    LOCK_SESSION;
     VIEW_PACKET_CHARACTER_LIST CharListPacket = { 0 };
     // Load character list from DB into session
     mpSession->LoadCharacterList();
@@ -236,36 +288,20 @@ void ViewHandler::SendWorldList()
 
 void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
 {
-    // Retry count for key installation
-    uint32_t dwKeyRetryCount = 0;
     // Session key
     const uint8_t* bufKey = NULL;
 
+    LOG_DEBUG0("Called.");
     // Backup the packet, as it will be needed in the second phase
     memcpy(&mLastLoginRequestPacket, pRequestPacket, sizeof(mLastLoginRequestPacket));
 
-    // Wait for key installation if needed
-    while ((bufKey == NULL) && (dwKeyRetryCount < KEY_INSTALLATION_TIMEOUT) && (mbShutdown == false)) {
-        try {
-            bufKey = mpSession->GetKey();
-        }
-        catch (std::runtime_error) {
-            dwKeyRetryCount++;
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-    }
-    if (bufKey == NULL) {
-        // Timed out waiting for client key
-        // TODO: Check whether there's a more suitable error code.
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
-    }
     LOCK_SESSION;
     // Notify the world server that a character wants to log in
     CharMessageHnd::MESSAGE_LOGIN_REQUEST LoginMessage;
-    LoginMessage.eType = MQConnection::MQ_MESSAGE_CHAR_LOGIN;
-    LoginMessage.dwCharacterID = pRequestPacket->dwCharacterID;
+    LoginMessage.Header.eType = MQConnection::MQ_MESSAGE_CHAR_LOGIN;
+    LoginMessage.Header.dwCharacterID = pRequestPacket->dwCharacterID;
+    LoginMessage.Header.dwAccountID = mpSession->GetAccountID();
     memcpy(&LoginMessage.bufInitialKey, bufKey, sizeof(LoginMessage.bufInitialKey));
-    LoginMessage.dwAccountID = mpSession->GetAccountID();
     LoginMessage.dwExpansions = mpSession->GetExpansionsBitmask();
     LoginMessage.dwFeatures = mpSession->GetFeaturesBitmask();
     // The client chops the character ID to uint16 (apparently this also happens on retail)
@@ -283,7 +319,7 @@ void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
         }
         if ((pCurrentChar->dwCharacterID % 0x10000 == pRequestPacket->dwCharacterID) &&
             (strncmp(pCurrentChar->szCharName, pRequestPacket->szCharacterName, sizeof(pCurrentChar->szCharName)) == 0)) {
-            LoginMessage.dwCharacterID = pCurrentChar->dwCharacterID;
+            LoginMessage.Header.dwCharacterID = pCurrentChar->dwCharacterID;
             break;
         }
     }
@@ -293,4 +329,36 @@ void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
     // continue the login process. Set a timeout so if the world server is down we don't keep
     // the client waiting forever.
     mtmOperationTimeout = time(NULL) + WORLD_SERVER_REPLY_TIMEOUT;
+}
+
+void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage)
+{
+    LOG_DEBUG0("Called.");
+    CharMessageHnd::MESSAGE_LOGIN_RESPONSE* pResponseMessage = reinterpret_cast<CharMessageHnd::MESSAGE_LOGIN_RESPONSE*>(pMQMessage.get());
+    // Do some sanity on the message we got
+    if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_LOGIN_ACK) ||
+        (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
+        (mpSession->IsCharacterAssociatedWithSession(pResponseMessage->Header.dwCharacterID))) {
+        // From the client's point of view this is a communication error with the map server
+        LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Login response detail mismatch.");
+    }
+    // Send the map server details to client
+    LOGIN_CONFIRM_PACKET ConfirmPacket = { 0 };
+    ConfirmPacket.dwContentID = mLastLoginRequestPacket.dwContentID;
+    ConfirmPacket.dwCharacterID = mLastLoginRequestPacket.dwCharacterID;
+    strncpy(ConfirmPacket.szCharacterName, mLastLoginRequestPacket.szCharacterName, sizeof(ConfirmPacket.szCharacterName)-1);
+    ConfirmPacket.dwUnknown = 2;
+    ConfirmPacket.dwZoneIP = pResponseMessage->dwZoneIP;
+    ConfirmPacket.wZonePort = pResponseMessage->wZonePort;
+    ConfirmPacket.wZero1 = 0;
+    ConfirmPacket.dwSearchIP = pResponseMessage->dwSearchIP;
+    ConfirmPacket.wSearchPort = pResponseMessage->wSearchPort;
+    ConfirmPacket.wZero2 = 0;
+    LOG_INFO("Character %s (%d) successfully logged-in.", ConfirmPacket.szCharacterName, ConfirmPacket.dwCharacterID);
+    mParser.SendPacket(FFXIPacket::FFXI_TYPE_LOGIN_RESPONSE, reinterpret_cast<uint8_t*>(&ConfirmPacket), sizeof(ConfirmPacket));
+    // At this point the client should switch to the zone server, our job's
+    // done so drop the connection.
+    mbShutdown = true;
 }

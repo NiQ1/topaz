@@ -104,7 +104,7 @@ private:
         uint32_t dwZoneIP;
         uint16_t wZonePort; // Network byte order
         uint16_t wZero1; // Seems to be little endian
-        uint32_t wSearchIP;
+        uint32_t dwSearchIP;
         uint16_t wSearchPort;
         uint16_t wZero2;
     };
@@ -146,6 +146,12 @@ private:
      */
     void HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket);
 
+    /**
+     *  Called after a a response from the world server,
+     *  completes the login process.
+     */
+    void CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage);
+
     /// FFXI Packet parser
     FFXIPacket mParser;
     /// Associated session
@@ -154,6 +160,10 @@ private:
     LOGIN_REQUEST_PACKET mLastLoginRequestPacket;
     /// Timeout for the current wait operation
     time_t mtmOperationTimeout;
+    /// Whether we've received a send character list request from client
+    bool mbReceivedSendCharListClient;
+    /// Whether we've received a send character list request from data server
+    bool mbReceivedSendCharListDataSrv;
 };
 
 #endif

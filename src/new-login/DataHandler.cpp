@@ -38,6 +38,8 @@ void DataHandler::Run()
     bool bGotKey = false;
     // Error has occurred
     bool bError = false;
+    // Request from view server
+    LoginSession::REQUESTS_TO_DATA_SERVER RequestFromView;
 
     LOG_DEBUG0("Called.");
     mbRunning = true;
@@ -52,6 +54,25 @@ void DataHandler::Run()
     }
 
     while ((mbShutdown == false) && (bError == false)) {
+
+        // Maybe we have a request from the view server
+        RequestFromView = mpSession->GetRequestFromViewServer();
+        if (RequestFromView != LoginSession::DATA_SERVER_IDLE) {
+            if (RequestFromView == LoginSession::DATA_SERVER_ASK_FOR_KEY) {
+                cOutgoingBytePacket = static_cast<uint8_t>(S2C_PACKET_SEND_KEY);
+                if (mpConnection->WriteAll(&cOutgoingBytePacket, sizeof(cOutgoingBytePacket)) != sizeof(cOutgoingBytePacket)) {
+                    LOG_WARNING("Client dropped the connection.");
+                    break;
+                }
+            }
+            else {
+                LOG_ERROR("Unknown data server state.");
+                break;
+            }
+            // Clear our own state machine
+            mpSession->SendRequestToDataServer(LoginSession::DATA_SERVER_IDLE);
+        }
+
         // Check for response from the client
         if (!mpConnection->CanRead(1000)) {
             // No data from client, keep on waiting
@@ -132,25 +153,21 @@ void DataHandler::Run()
         if (bError) {
             break;
         }
-        // Determine what our answer is going to be. If we arrived here we know that the
-        // client has already provided its account ID so no need to check that
-        /*if (bGotKey == false) {
-            // We still need the key
-            cOutgoingBytePacket = static_cast<uint8_t>(S2C_PACKET_SEND_KEY);
-            if (mpConnection->WriteAll(&cOutgoingBytePacket, sizeof(cOutgoingBytePacket)) != sizeof(cOutgoingBytePacket)) {
-                LOG_WARNING("Client dropped the connection.");
-                break;
-            }
-        }
-        else {*/
-            LOG_DEBUG1("Sending character list to client.");
-            // Seems that xiloader doesn't like us to send the list too quickly
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            SendCharacterList();
-        //}
+        LOG_DEBUG1("Sending character list to client.");
+        // Seems that xiloader doesn't like us to send the list too quickly
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        SendCharacterList();
+        // Signal the view server that the character list packet can be sent
+        mpSession->SendRequestToViewServer(LoginSession::VIEW_SERVER_SEND_CHARACTER_LIST);
     }
     LOG_INFO("Client successfully connected with account ID: %d", mdwAccountID);
     mpConnection->Close();
+    mpSession->SetDataServerFinished();
+    if (mpSession->IsViewServerFinished()) {
+        // Both servers have finished so mark the session as expired
+        // so it gets cleaned up immediately.
+        mpSession->SetExpiryTimeAbsolute(0);
+    }
     mbRunning = false;
 }
 
@@ -163,7 +180,7 @@ void DataHandler::SendCharacterList()
     mpSession->LoadCharacterList();
     uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
     uint8_t cNumChars = min(mpSession->GetNumCharacters(), cNumCharsAllowed);
-    const LoginSession::CHARACTER_ENTRY* pCurrentChar;
+    const CharMessageHnd::CHARACTER_ENTRY* pCurrentChar;
 
     for (uint8_t i = 0; i < cNumChars; i++) {
         pCurrentChar = mpSession->GetCharacter(i);

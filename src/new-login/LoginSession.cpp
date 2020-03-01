@@ -24,7 +24,9 @@ LoginSession::LoginSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL
     mcNumCharsAllowed(0),
     mbCharListLoaded(false),
     mdwExpansionsBitmask(0),
-    mdwFeaturesBitmask(0)
+    mdwFeaturesBitmask(0),
+    mbDataServerFinished(false),
+    mbViewServerFinished(false)
 {
     LOG_DEBUG0("Called.");
     memset(mbufInitialKey, 0, sizeof(mbufInitialKey));
@@ -235,30 +237,71 @@ void LoginSession::LoadCharacterList()
     LOG_DEBUG1("Character list loaded.");
 }
 
-void LoginSession::SendRequestToDataServer(LoginSession::DATA_VIEW_REQUESTS Request)
+void LoginSession::SendRequestToDataServer(REQUESTS_TO_DATA_SERVER State)
 {
-    LOCK_SESSION;
-    mRequestsToData.push(Request);
+    mRequestToData = State;
 }
 
-void LoginSession::SendRequestToViewServer(LoginSession::DATA_VIEW_REQUESTS Request)
+void LoginSession::SendRequestToViewServer(REQUESTS_TO_VIEW_SERVER State)
 {
-    LOCK_SESSION;
-    mRequestsToView.push(Request);
+    mRequestToView = State;
 }
 
-LoginSession::DATA_VIEW_REQUESTS LoginSession::GetRequestFromDataServer()
+LoginSession::REQUESTS_TO_VIEW_SERVER LoginSession::GetRequestFromDataServer()
 {
-    LOCK_SESSION;
-    DATA_VIEW_REQUESTS Request = mRequestsToView.front();
-    mRequestsToView.pop();
-    return Request;
+    return mRequestToView;
 }
 
-LoginSession::DATA_VIEW_REQUESTS LoginSession::GetRequestFromViewServer()
+LoginSession::REQUESTS_TO_DATA_SERVER LoginSession::GetRequestFromViewServer()
 {
+    return mRequestToData;
+}
+
+bool LoginSession::IsDataServerFinished() const
+{
+    return mbDataServerFinished;
+}
+
+bool LoginSession::IsViewServerFinished() const
+{
+    return mbViewServerFinished;
+}
+
+void LoginSession::SetDataServerFinished()
+{
+    mbDataServerFinished = true;
+}
+
+void LoginSession::SetViewServerFinished()
+{
+    mbViewServerFinished = true;
+}
+
+std::shared_ptr<uint8_t> LoginSession::GetMessageFromMQ()
+{
+    std::shared_ptr<uint8_t> pMessage(mpMessageFromMQ);
+    mpMessageFromMQ = NULL;
+    return pMessage;
+}
+
+void LoginSession::SendMQMessageToViewServer(std::shared_ptr<uint8_t> pMQMessage)
+{
+    if (mpMessageFromMQ != NULL) {
+        LOG_ERROR("Message sent to session before the previous was read.");
+        throw std::runtime_error("Message sent too quickly.");
+    }
+    mpMessageFromMQ = pMQMessage;
+}
+
+bool LoginSession::IsCharacterAssociatedWithSession(uint32_t dwCharacterID)
+{
+    uint8_t i = 0;
+
     LOCK_SESSION;
-    DATA_VIEW_REQUESTS Request = mRequestsToData.front();
-    mRequestsToData.pop();
-    return Request;
+    for (i = 0; i < mcNumCharacters; i++) {
+        if (mCharacters[i].dwCharacterID == dwCharacterID) {
+            return true;
+        }
+    }
+    return false;
 }

@@ -112,6 +112,18 @@ public:
     std::string GetClientVersion() const;
 
     /**
+     *  Check if the data server has finished
+     *  @return true if finished, false is still running.
+     */
+    bool IsDataServerFinished() const;
+
+    /**
+     *  Check if the view server has finished
+     *  @return true if finished, false is still running.
+     */
+    bool IsViewServerFinished() const;
+
+    /**
      *  Set the encryption key for this session.
      *  @param bufKey 24 byte long key buffer
      */
@@ -161,6 +173,16 @@ public:
     void SetClientVersion(std::string& strClientVersion);
 
     /**
+     *  Signal that the data server has finished running
+     */
+    void SetDataServerFinished();
+
+    /**
+     *  Signal that the view server has finished running
+     */
+    void SetViewServerFinished();
+
+    /**
      *  Load the character list from the DB
      */
     void LoadCharacterList();
@@ -173,38 +195,74 @@ public:
     const CharMessageHnd::CHARACTER_ENTRY* GetCharacter(uint8_t cOffset);
 
     /**
-     *  List of requests that go between the data and view servers.
+     *  Internal requests sent to the data server
      */
-    enum DATA_VIEW_REQUESTS {
-        NO_REQUEST = 0,
-        VIEW_SEND_CHARACTER_LIST
+    enum REQUESTS_TO_DATA_SERVER {
+        DATA_SERVER_IDLE = 0,
+        // The data server should request the user to send the session key
+        DATA_SERVER_ASK_FOR_KEY = 1
     };
 
     /**
-     *  Issued by the view server to send a request to the data server
-     *  @param Request request type to send
+     *  Internal requests sent to the view server
      */
-    void SendRequestToDataServer(DATA_VIEW_REQUESTS Request);
+    enum REQUESTS_TO_VIEW_SERVER {
+        VIEW_SERVER_IDLE = 0,
+        // Bootloader has installed the character list and the view server
+        // can send the full packet.
+        VIEW_SERVER_SEND_CHARACTER_LIST = 1,
+        // Bootloader has installed the session key and the character can
+        // log in
+        VIEW_SERVER_PROCEED_LOGIN = 2
+    };
 
     /**
-     *  Issued by the data server to send a request to the view server
+     *  Issued by the view server to send a signal to the data server
      *  @param Request request type to send
      */
-    void SendRequestToViewServer(DATA_VIEW_REQUESTS Request);
+    void SendRequestToDataServer(REQUESTS_TO_DATA_SERVER State);
 
     /**
-     *  Issued by the view server to check and receive messages from
+     *  Issued by the data server to send a signal to the view server
+     *  @param Request request type to send
+     */
+    void SendRequestToViewServer(REQUESTS_TO_VIEW_SERVER State);
+
+    /**
+     *  Issued by the view server to check and receive signals from
      *  the data server.
-     *  @return Pending request or NO_REQUEST if none
+     *  @return Pending signal or VIEW_SERVER_IDLE if none
      */
-    DATA_VIEW_REQUESTS GetRequestFromDataServer();
+    REQUESTS_TO_VIEW_SERVER GetRequestFromDataServer();
 
     /**
-     *  Issued by the data server to check and receive messages from
+     *  Issued by the data server to check and receive signals from
      *  the view server.
      *  @return Pending request or NO_REQUEST if none
      */
-    DATA_VIEW_REQUESTS GetRequestFromViewServer();
+    REQUESTS_TO_DATA_SERVER GetRequestFromViewServer();
+
+    /**
+     *  Get the last message sent from the MQ regarding this session.
+     *  @return Last message from MQ.
+     *  @note Also removes the message from the queue
+     */
+    std::shared_ptr<uint8_t> GetMessageFromMQ();
+
+    /**
+     *  Called by the MQ handler to send a message to the view server.
+     *  @param pMQMessage message to send
+     *  @note Will throw if an existing message is already pending
+     */
+    void SendMQMessageToViewServer(std::shared_ptr<uint8_t> pMQMessage);
+
+    /**
+     *  Check whether a given character ID is associated with the account
+     *  being processed in this session.
+     *  @param dwChacarcterID Character ID to check
+     *  @return True if associated with this session, false otherwise
+     */
+    bool IsCharacterAssociatedWithSession(uint32_t dwCharacterID);
 
 private:
     // Account ID received from authentication
@@ -234,13 +292,19 @@ private:
     // Character data list
     CharMessageHnd::CHARACTER_ENTRY mCharacters[16];
     // Whether character list has been loaded
-    bool mbCharListLoaded = false;
+    bool mbCharListLoaded;
     // Mutex for access sync
     std::recursive_mutex mMutex;
-    // Requests to the data server
-    std::queue<DATA_VIEW_REQUESTS> mRequestsToData;
-    // Requests to the view server
-    std::queue<DATA_VIEW_REQUESTS> mRequestsToView;
+    // Request sent to the data server
+    REQUESTS_TO_DATA_SERVER mRequestToData;
+    // Request to the view server
+    REQUESTS_TO_VIEW_SERVER mRequestToView;
+    // Has the data server finished
+    bool mbDataServerFinished;
+    // Has the view server finished
+    bool mbViewServerFinished;
+    // Request received from MQ to view server
+    std::shared_ptr<uint8_t> mpMessageFromMQ;
 };
 
 #endif
