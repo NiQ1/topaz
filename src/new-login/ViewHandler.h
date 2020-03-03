@@ -44,33 +44,46 @@ public:
 private:
 
 #pragma pack(push ,1)
+
+    /**
+     *  Character details. This struct is embedded within character list and character
+     *  creation packets.
+     */
+    struct VIEW_CHAR_DETAILS_ENTRY {
+        uint8_t cRace;          // 0
+        uint8_t cZero1;         // 1
+        uint8_t cMainJob;       // 2
+        uint8_t bufZero2[3];    // 3-->5
+        uint8_t cNation;        // 6
+        uint16_t wZero2;        // 7-->8
+        uint8_t cSize;          // 9
+        uint16_t wZero3;        // 10-->11
+        uint8_t cFace;          // 12
+        uint8_t cHair;          // 13
+        uint16_t wHead;         // 14-->15
+        uint16_t wBody;         // 16-->17
+        uint16_t wHands;        // 18-->19
+        uint16_t wLegs;         // 20-->21
+        uint16_t wFeet;         // 22-->23
+        uint16_t wMain;         // 24-->25
+        uint16_t wSub;          // 26-->27
+        uint8_t cZone1;         // 28
+        uint8_t cMainJobLevel;  // 29
+        char bufUnknown5[4];    // 30-->33      (0x01, 0x00, 0x02, 0x00)
+        uint16_t wZone2;        // 34-->35
+        char bufUnknown6[60];   // 36-->95
+    };
+
     /**
      *  Entry of a character in the character list packet
      */
     struct VIEW_CHAR_LIST_ENTRY {
-        uint32_t dwContentID;       // 0-->3
-        uint32_t dwCharacterID;     // 4-->7
-        uint32_t dwEnabled;         // 8-->11       (0x00000001)
-        char szCharacterName[16];   // 12-->27
-        char szWorldName[16];       // 28-->43
-        uint8_t cRace;              // 44
-        uint8_t cUnknown2;          // 45
-        uint8_t cMainJob;           // 46
-        char bufUnknown3[9];        // 47-->55
-        uint8_t cFace;              // 56
-        uint8_t cUnknown4;          // 57           (0x02)
-        uint16_t wHead;             // 58-->59
-        uint16_t wBody;             // 60-->61
-        uint16_t wHands;            // 62-->63
-        uint16_t wLegs;             // 64-->65
-        uint16_t wFeet;             // 66-->67
-        uint16_t wMain;             // 68-->69
-        uint16_t wSub;              // 70-->71
-        uint8_t cZone1;             // 72
-        uint8_t cMainJobLevel;      // 73
-        char bufUnknown5[4];        // 74-->77      (0x01, 0x00, 0x02, 0x00)
-        uint16_t wZone2;            // 78-->79
-        char bufUnknown6[60];       // 80-->139
+        uint32_t dwContentID;             // 0-->3
+        uint32_t dwCharacterID;           // 4-->7
+        uint32_t dwEnabled;               // 8-->11
+        char szCharacterName[16];         // 12-->27
+        char szWorldName[16];             // 28-->43
+        VIEW_CHAR_DETAILS_ENTRY Details;
     };
 
     /**
@@ -93,7 +106,7 @@ private:
     };
 
     /**
-     *  Server confirms login request
+     *  Server confirms login request (0x0B)
      */
     struct LOGIN_CONFIRM_PACKET
     {
@@ -110,7 +123,7 @@ private:
     };
 
     /**
-     *  Client requests to log-in
+     *  Client requests to log-in (0x07)
      */
     struct LOGIN_REQUEST_PACKET
     {
@@ -120,6 +133,38 @@ private:
         uint8_t bufUnknown1[16];
         uint32_t dwUnknown2; // Seems to always be 0x00000003
         uint8_t bufUnknown3[16];
+    };
+
+    /**
+     *  Client requests to create a new character (0x22)
+     */
+    struct CREATE_REQUEST_PACKET
+    {
+        uint32_t dwContentID;
+        char szCharacterName[16];
+        uint8_t bufUnknown1[16];
+        char szWorldName[16];
+        uint8_t bufUnknown2[16];
+    };
+
+    /**
+     *  Client confirms character creation (0x21)
+     */
+    struct CONFIRM_CREATE_REQUEST_PACKET
+    {
+        uint32_t dwContentID;            // 0-->3
+        uint8_t bufUnknown1[16];         // 4-->19
+        VIEW_CHAR_DETAILS_ENTRY Details;
+    };
+
+    /**
+     *  Client requests to delete a character (0x14)
+     */
+    struct DELETE_REQUEST_PACKET
+    {
+        uint32_t dwContentID;
+        uint32_t dwCharacterID;
+        uint8_t bufUnknown1[16];
     };
 
 #pragma pack(pop)
@@ -149,8 +194,10 @@ private:
     /**
      *  Called after a a response from the world server,
      *  completes the login process.
+     *  @param pMQMessage The raw MQ message
+     *  @param cWorldID The world ID the character is logging into
      */
-    void CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage);
+    void CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID);
 
     /// FFXI Packet parser
     FFXIPacket mParser;

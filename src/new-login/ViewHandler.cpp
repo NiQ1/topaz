@@ -127,16 +127,23 @@ void ViewHandler::Run()
             }
 
             // Maybe we have a message waiting from MQ
-            pMessageFromMQ = mpSession->GetMessageFromMQ();
+            uint8_t cOrigin = 0;
+            pMessageFromMQ = mpSession->GetMessageFromMQ(&cOrigin);
             if (pMessageFromMQ != NULL) {
                 switch (*reinterpret_cast<MQConnection::MQ_MESSAGE_TYPES*>(pMessageFromMQ.get())) {
                 case MQConnection::MQ_MESSAGE_CHAR_LOGIN_ACK:
-                    CompleteLoginRequest(pMessageFromMQ);
+                    CompleteLoginRequest(pMessageFromMQ, cOrigin);
                     break;
                 default:
                     LOG_ERROR("Invalid message received from world server.");
                     throw std::runtime_error("MQ message type unknown.");
                 }
+            }
+
+            // Maybe we've timed out
+            if ((mtmOperationTimeout != 0) && (time(NULL) >= mtmOperationTimeout)) {
+                LOG_ERROR("Timed out waiting for a reply from the world server.");
+                throw std::runtime_error("World server response timeout.");
             }
         }
     }
@@ -214,47 +221,41 @@ void ViewHandler::SendCharacterList()
     // Load character list from DB into session
     mpSession->LoadCharacterList();
     uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
-    uint8_t cNumChars = min(mpSession->GetNumCharacters(), cNumCharsAllowed);
     const CharMessageHnd::CHARACTER_ENTRY* pCurrentChar;
     WorldManagerPtr WorldMgr = WorldManager::GetInstance();
 
     CharListPacket.dwContentIds = mpSession->GetNumCharsAllowed();
-    // Set the enabled bit on the allowed slots so the client knows it can
-    // use these content IDs.
-    for (uint8_t i = 0; i < cNumCharsAllowed; i++) {
-        CharListPacket.CharList[i].dwEnabled = 1;
-        // Charname is a space == character doesn't exist
-        // (Will be overwritten later for characters that do exist).
-        CharListPacket.CharList[i].szCharacterName[0] = ' ';
-    }
-    // Max content IDs per account is 16, so this guarantees that no two accounts
-    // will have overlapping content ids.
-    uint32_t dwBaseContentID = mpSession->GetAccountID() * 16;
-    for (uint8_t i = 0; i < cNumChars; i++) {
+    for (uint8_t i = 0; i < CharListPacket.dwContentIds; i++) {
         pCurrentChar = mpSession->GetCharacter(i);
-        CharListPacket.CharList[i].dwContentID = dwBaseContentID + i;
+        CharListPacket.CharList[i].dwContentID = pCurrentChar->dwContentID;
+        CharListPacket.CharList[i].dwEnabled = pCurrentChar->bEnabled;
+        if (pCurrentChar->szCharName[0] == ' ') {
+            // This content ID is not associated with a character so don't do meaningless work
+            continue;
+        }
         CharListPacket.CharList[i].dwCharacterID = pCurrentChar->dwCharacterID;
-        CharListPacket.CharList[i].dwEnabled = 1;
         strncpy(CharListPacket.CharList[i].szCharacterName, pCurrentChar->szCharName, sizeof(CharListPacket.CharList[i].szCharacterName) - 1);
         strncpy(CharListPacket.CharList[i].szWorldName, WorldMgr->GetWorldName(pCurrentChar->cWorldID).c_str(), sizeof(CharListPacket.CharList[i].szWorldName));
-        CharListPacket.CharList[i].cRace = pCurrentChar->cRace;
-        CharListPacket.CharList[i].cMainJob = pCurrentChar->cMainJob;
-        CharListPacket.CharList[i].cFace = static_cast<uint8_t>(pCurrentChar->wFace);
-        CharListPacket.CharList[i].cUnknown4 = 2;
-        CharListPacket.CharList[i].wHead = pCurrentChar->wHead;
-        CharListPacket.CharList[i].wBody = pCurrentChar->wBody;
-        CharListPacket.CharList[i].wHands = pCurrentChar->wHands;
-        CharListPacket.CharList[i].wLegs = pCurrentChar->wLegs;
-        CharListPacket.CharList[i].wFeet = pCurrentChar->wFeet;
-        CharListPacket.CharList[i].wMain = pCurrentChar->wMain;
-        CharListPacket.CharList[i].wSub = pCurrentChar->wSub;
-        CharListPacket.CharList[i].cZone1 = static_cast<uint8_t>(pCurrentChar->wZone);
-        CharListPacket.CharList[i].cMainJobLevel = pCurrentChar->cMainJobLevel;
-        CharListPacket.CharList[i].bufUnknown5[0] = 1;
-        CharListPacket.CharList[i].bufUnknown5[1] = 0;
-        CharListPacket.CharList[i].bufUnknown5[2] = 2;
-        CharListPacket.CharList[i].bufUnknown5[3] = 0;
-        CharListPacket.CharList[i].wZone2 = pCurrentChar->wZone;
+        CharListPacket.CharList[i].Details.cRace = pCurrentChar->cRace;
+        CharListPacket.CharList[i].Details.cMainJob = pCurrentChar->cMainJob;
+        CharListPacket.CharList[i].Details.cNation = pCurrentChar->cNation;
+        CharListPacket.CharList[i].Details.cSize = pCurrentChar->cSize;
+        CharListPacket.CharList[i].Details.cFace = pCurrentChar->cFace;
+        CharListPacket.CharList[i].Details.cHair = pCurrentChar->cHair;
+        CharListPacket.CharList[i].Details.wHead = pCurrentChar->wHead;
+        CharListPacket.CharList[i].Details.wBody = pCurrentChar->wBody;
+        CharListPacket.CharList[i].Details.wHands = pCurrentChar->wHands;
+        CharListPacket.CharList[i].Details.wLegs = pCurrentChar->wLegs;
+        CharListPacket.CharList[i].Details.wFeet = pCurrentChar->wFeet;
+        CharListPacket.CharList[i].Details.wMain = pCurrentChar->wMain;
+        CharListPacket.CharList[i].Details.wSub = pCurrentChar->wSub;
+        CharListPacket.CharList[i].Details.cZone1 = static_cast<uint8_t>(pCurrentChar->wZone);
+        CharListPacket.CharList[i].Details.cMainJobLevel = pCurrentChar->cMainJobLevel;
+        CharListPacket.CharList[i].Details.bufUnknown5[0] = 1;
+        CharListPacket.CharList[i].Details.bufUnknown5[1] = 0;
+        CharListPacket.CharList[i].Details.bufUnknown5[2] = 2;
+        CharListPacket.CharList[i].Details.bufUnknown5[3] = 0;
+        CharListPacket.CharList[i].Details.wZone2 = pCurrentChar->wZone;
     }
     LOG_DEBUG1("Sending character list.");
     mParser.SendPacket(FFXIPacket::FFXI_TYPE_CHARACTER_LIST, reinterpret_cast<uint8_t*>(&CharListPacket), sizeof(CharListPacket));
@@ -302,6 +303,7 @@ void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
     LoginMessage.Header.dwCharacterID = pRequestPacket->dwCharacterID;
     LoginMessage.Header.dwAccountID = mpSession->GetAccountID();
     memcpy(&LoginMessage.bufInitialKey, bufKey, sizeof(LoginMessage.bufInitialKey));
+    LoginMessage.dwIPAddress = mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr;
     LoginMessage.dwExpansions = mpSession->GetExpansionsBitmask();
     LoginMessage.dwFeatures = mpSession->GetFeaturesBitmask();
     // The client chops the character ID to uint16 (apparently this also happens on retail)
@@ -317,7 +319,12 @@ void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
             LOG_ERROR("Get character returned NULL pointer.");
             throw std::runtime_error("Get character failed.");
         }
+        if (!pCurrentChar->bEnabled) {
+            LOG_ERROR("Attempted to login into a disabled content ID.");
+            throw std::runtime_error("Content ID disabled.");
+        }
         if ((pCurrentChar->dwCharacterID % 0x10000 == pRequestPacket->dwCharacterID) &&
+            (pCurrentChar->dwContentID == pRequestPacket->dwContentID) &&
             (strncmp(pCurrentChar->szCharName, pRequestPacket->szCharacterName, sizeof(pCurrentChar->szCharName)) == 0)) {
             LoginMessage.Header.dwCharacterID = pCurrentChar->dwCharacterID;
             break;
@@ -331,14 +338,14 @@ void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
     mtmOperationTimeout = time(NULL) + WORLD_SERVER_REPLY_TIMEOUT;
 }
 
-void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage)
+void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID)
 {
     LOG_DEBUG0("Called.");
     CharMessageHnd::MESSAGE_LOGIN_RESPONSE* pResponseMessage = reinterpret_cast<CharMessageHnd::MESSAGE_LOGIN_RESPONSE*>(pMQMessage.get());
     // Do some sanity on the message we got
     if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_LOGIN_ACK) ||
         (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
-        (mpSession->IsCharacterAssociatedWithSession(pResponseMessage->Header.dwCharacterID))) {
+        (mpSession->IsCharacterAssociatedWithSession(pResponseMessage->Header.dwCharacterID, cWorldID))) {
         // From the client's point of view this is a communication error with the map server
         LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
         mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);

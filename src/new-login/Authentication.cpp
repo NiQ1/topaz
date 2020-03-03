@@ -90,21 +90,23 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         std::string strSalt(GenerateSalt());
         // Showtime
         if (pszEmail) {
-            strSqlQueryFmt = "INSERT INTO %saccounts (username, password, salt, email) VALUES ('%s', SHA2(CONCAT('%s', '%s'), 256), '%s', '%s')";
+            strSqlQueryFmt = "INSERT INTO %saccounts (username, password, salt, email) VALUES ('%s', SHA2(CONCAT('%s', '%s', '%s'), 256), '%s', '%s')";
             strSqlFinalQuery = FormatString(&strSqlQueryFmt,
                 Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
                 Database::RealEscapeString(pszUsername).c_str(),
                 Database::RealEscapeString(pszPassword).c_str(),
+                Database::RealEscapeString(Config->GetConfigString("password_hash_secret")).c_str(),
                 Database::RealEscapeString(strSalt).c_str(),
                 Database::RealEscapeString(strSalt).c_str(),
                 Database::RealEscapeString(pszEmail).c_str());
         }
         else {
-            strSqlQueryFmt = "INSERT INTO %saccounts (username, password, salt) VALUES ('%s', SHA2(CONCAT('%s', '%s'), 256), '%s')";
+            strSqlQueryFmt = "INSERT INTO %saccounts (username, password, salt) VALUES ('%s', SHA2(CONCAT('%s', '%s', '%s'), 256), '%s')";
             strSqlFinalQuery = FormatString(&strSqlQueryFmt,
                 Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
                 Database::RealEscapeString(pszUsername).c_str(),
                 Database::RealEscapeString(pszPassword).c_str(),
+                Database::RealEscapeString(Config->GetConfigString("password_hash_secret")).c_str(),
                 Database::RealEscapeString(strSalt).c_str(),
                 Database::RealEscapeString(strSalt).c_str());
             }
@@ -126,6 +128,14 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         pAccountsFound->next();
         mLastError = AUTH_SUCCESS;
         uint32_t dwAccountId = pAccountsFound->get_unsigned32(0);
+        // Associate content ids with this account so it can actually create characters
+        uint8_t cContentIds = min(static_cast<uint8_t>(Config->GetConfigUInt("new_account_content_ids")), 16);
+        strSqlQueryFmt = "INSERT INTO %scontents (account_id) VALUES (%d);";
+        strSqlFinalQuery = FormatString(&strSqlQueryFmt,
+            Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str());
+        for (uint8_t i = 0; i < cContentIds; i++) {
+            DB->insert(strSqlFinalQuery);
+        }
         // Add this account to the session tracker, which will allow the client
         // to connect to the data server.
         std::shared_ptr<LoginSession> NewSession = SessionTracker::GetInstance()->InitializeNewSession(dwAccountId,
@@ -161,10 +171,11 @@ bool Authentication::ChangePassword(const char* pszUsername, const char* pszOldP
             return false;
         }
         std::string strSalt(GenerateSalt());
-        std::string strSqlQueryFmt("UPDATE %saccounts SET password=SHA2(CONCAT('%s', '%s'), 256), salt='%s' WHERE id=%d;");
+        std::string strSqlQueryFmt("UPDATE %saccounts SET password=SHA2(CONCAT('%s', '%s', '%s'), 256), salt='%s' WHERE id=%d;");
         if (DB->execute(FormatString(&strSqlQueryFmt,
             Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
             Database::RealEscapeString(pszNewPassword).c_str(),
+            Database::RealEscapeString(Config->GetConfigString("password_hash_secret")).c_str(),
             Database::RealEscapeString(strSalt).c_str(),
             Database::RealEscapeString(strSalt).c_str(),
             dwUserUID)) == 0) {

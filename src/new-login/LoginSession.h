@@ -244,25 +244,28 @@ public:
 
     /**
      *  Get the last message sent from the MQ regarding this session.
+     *  @param pSendingWorld If not NULL, receives the world ID of the sender
      *  @return Last message from MQ.
      *  @note Also removes the message from the queue
      */
-    std::shared_ptr<uint8_t> GetMessageFromMQ();
+    std::shared_ptr<uint8_t> GetMessageFromMQ(uint8_t* pSendingWorld = NULL);
 
     /**
      *  Called by the MQ handler to send a message to the view server.
      *  @param pMQMessage message to send
+     *  @param cSendingWorld World ID of the sender
      *  @note Will throw if an existing message is already pending
      */
-    void SendMQMessageToViewServer(std::shared_ptr<uint8_t> pMQMessage);
+    void SendMQMessageToViewServer(std::shared_ptr<uint8_t> pMQMessage, uint8_t cSendingWorld);
 
     /**
      *  Check whether a given character ID is associated with the account
      *  being processed in this session.
      *  @param dwChacarcterID Character ID to check
+     *  @param cWorldID World ID scope for the character
      *  @return True if associated with this session, false otherwise
      */
-    bool IsCharacterAssociatedWithSession(uint32_t dwCharacterID);
+    bool IsCharacterAssociatedWithSession(uint32_t dwCharacterID, uint8_t cWorldID);
 
 private:
     // Account ID received from authentication
@@ -305,6 +308,8 @@ private:
     bool mbViewServerFinished;
     // Request received from MQ to view server
     std::shared_ptr<uint8_t> mpMessageFromMQ;
+    // World ID of the sender of the MQ message
+    uint8_t mcMQMessageOriginatingWorld;
 };
 
 #endif

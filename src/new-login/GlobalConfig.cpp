@@ -229,6 +229,14 @@ std::string GlobalConfig::GetDefaultValue(const std::string& strConfigName)
     else if (strConfigName == "login_ip") {
         return "0.0.0.0";
     }
+    else if (strConfigName == "password_hash_secret") {
+        // Secret to add to password hashes, change this to something random
+        return "";
+    }
+    else if (strConfigName == "new_account_content_ids") {
+        // Number of content ids to associate with new accounts
+        return "3";
+    }
     else if (strConfigName == "max_login_attempts") {
         // Max number of login attempts before the client is disconnected
         return "3";

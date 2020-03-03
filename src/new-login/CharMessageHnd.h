@@ -50,15 +50,19 @@ public:
      */
     struct CHARACTER_ENTRY
     {
+        uint32_t dwContentID;
+        bool bEnabled;
         uint32_t dwCharacterID;
         char szCharName[16];
-        uint32_t dwAccountID;
         uint8_t cWorldID;
         uint8_t cMainJob;
         uint8_t cMainJobLevel;
         uint16_t wZone;
         uint8_t cRace;
-        uint16_t wFace;
+        uint8_t cFace;
+        uint8_t cHair;
+        uint8_t cSize;
+        uint8_t cNation;
         // Whatever the char was wearing when last logged-out
         uint16_t wHead;
         uint16_t wBody;
@@ -78,6 +82,7 @@ public:
     {
         CHAR_MQ_MESSAGE_HEADER Header;
         uint8_t bufInitialKey[16];
+        uint32_t dwIPAddress;
         // Map server may decide to allow/disallow content based on these
         uint32_t dwExpansions;
         uint32_t dwFeatures;
@@ -107,9 +112,19 @@ public:
 
     /**
      *  Get character details from the DB
-     *  @param dwCharacterID Character ID to query
+     *  @param dwContentID Unique character content ID
+     *  @return Character details struct
      */
-    static CHARACTER_ENTRY QueryCharacter(uint32_t dwCharacterID);
+    static CHARACTER_ENTRY QueryCharacter(uint32_t dwContentID);
+
+    /**
+     *  Get character details from the DB
+     *  @param dwCharacterID Character ID to query
+     *  @param cWorldID World ID for the character (character IDs are only unique within the world)
+     *  @return Character details struct
+     */
+    static CHARACTER_ENTRY QueryCharacter(uint32_t dwCharacterID, uint8_t cWorldID);
+
 };
 
 #endif

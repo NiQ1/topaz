@@ -26,7 +26,8 @@ LoginSession::LoginSession(uint32_t dwAccountId, uint32_t dwIpAddr, time_t tmTTL
     mdwExpansionsBitmask(0),
     mdwFeaturesBitmask(0),
     mbDataServerFinished(false),
-    mbViewServerFinished(false)
+    mbViewServerFinished(false),
+    mcMQMessageOriginatingWorld(0)
 {
     LOG_DEBUG0("Called.");
     memset(mbufInitialKey, 0, sizeof(mbufInitialKey));
@@ -183,55 +184,81 @@ void LoginSession::LoadCharacterList()
     LOCK_DB;
     LOCK_CONFIG;
 
-    // The size of the packet is determined by the number of characters
-    // the user is allowed to create, which is the content_ids column
-    // in the accounts table.
-    std::string strSqlQueryFmt("SELECT content_ids FROM %saccounts WHERE id=%d;");
+    // First, query all content ids, which should be in the table even if not
+    // yet associated with a character.
+    std::string strSqlQueryFmt("SELECT content_id, enabled FROM %sacontents WHERE account_id=%d ORDER BY content_id LIMIT 16;");
     std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
         Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
         mdwAccountId));
     mariadb::result_set_ref pResultSet = DB->query(strSqlFinalQuery);
-    if (pResultSet->row_count() == 0) {
-        LOG_ERROR("Failed to query the number of content IDs.");
-        throw std::runtime_error("content_ids query failed.");
+    mcNumCharsAllowed = static_cast<uint8_t>(pResultSet->row_count());
+    if (mcNumCharsAllowed == 0) {
+        LOG_ERROR("No Content IDs associated with the given account");
+        throw std::runtime_error("content_id query failed.");
     }
-    pResultSet->next();
-    mcNumCharsAllowed = static_cast<uint8_t>(pResultSet->get_unsigned32(0));
-    CharMessageHnd::CHARACTER_ENTRY CharList[16];
-    memset(&CharList, 0, sizeof(CharList));
-    strSqlQueryFmt = "SELECT id, name, account_id, world_id, main_job, main_job_lv, "
-        "zone, race, face, head, body, hands, legs, feet, main, sub "
-        "FROM %schars WHERE account_id=%d ORDER BY id LIMIT %u;";
+    memset(&mCharacters, 0, sizeof(mCharacters));
+    uint32_t i = 0;
+    while (pResultSet->next()) {
+        if (i >= 16) {
+            LOG_WARNING("Too many content IDs associated with the account, ignoring extra content ids!");
+            break;
+        }
+        mCharacters[i].dwContentID = pResultSet->get_unsigned32(0);
+        mCharacters[i].bEnabled = pResultSet->get_boolean(1);
+        // This tells the client that this content ID is not associated with a character
+        // (if it is, it will be overwritten very soon).
+        mCharacters[i].szCharName[0] = ' ';
+        i++;
+    }
+    // It's now time to get the actual list of characters
+    strSqlQueryFmt = "SELECT content_id, character_id, name, world_id, main_job, main_job_lv, "
+        "zone, race, face, hair, head, body, hands, legs, feet, main, sub, size, nation "
+        "FROM %schars WHERE content_id IN (SELECT content_id from %scontents WHERE account_id=%d) ORDER BY content_id;";
     strSqlFinalQuery = FormatString(&strSqlQueryFmt,
         Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
-        mdwAccountId, static_cast<uint32_t>(mcNumCharsAllowed));
+        Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+        mdwAccountId);
     pResultSet = DB->query(strSqlFinalQuery);
-    uint8_t cNumchars = 0;
-    uint32_t dwCurrentChar = 0;
+    i = 0;
+    uint32_t dwCurrentContentID = 0;
+    uint32_t j = 0;
     while (pResultSet->next()) {
-        dwCurrentChar = pResultSet->get_unsigned32(0);
-        mCharacters[cNumchars].dwCharacterID = dwCurrentChar;
-        CharList[cNumchars].dwCharacterID = dwCurrentChar;
-        strncpy(CharList[cNumchars].szCharName, pResultSet->get_string(1).c_str(), sizeof(CharList[cNumchars].szCharName));
-        CharList[cNumchars].dwAccountID = pResultSet->get_unsigned32(2);
-        CharList[cNumchars].cWorldID = static_cast<uint8_t>(pResultSet->get_unsigned32(3));
-        CharList[cNumchars].cMainJob = static_cast<uint8_t>(pResultSet->get_unsigned32(4));
-        CharList[cNumchars].cMainJobLevel = static_cast<uint8_t>(pResultSet->get_unsigned32(5));
-        CharList[cNumchars].wZone = static_cast<uint16_t>(pResultSet->get_unsigned32(6));
-        CharList[cNumchars].cRace = static_cast<uint8_t>(pResultSet->get_unsigned32(7));
-        CharList[cNumchars].wFace = static_cast<uint16_t>(pResultSet->get_unsigned32(8));
-        CharList[cNumchars].wHead = static_cast<uint16_t>(pResultSet->get_unsigned32(9));
-        CharList[cNumchars].wBody = static_cast<uint16_t>(pResultSet->get_unsigned32(10));
-        CharList[cNumchars].wHands = static_cast<uint16_t>(pResultSet->get_unsigned32(11));
-        CharList[cNumchars].wLegs = static_cast<uint16_t>(pResultSet->get_unsigned32(12));
-        CharList[cNumchars].wFeet = static_cast<uint16_t>(pResultSet->get_unsigned32(13));
-        CharList[cNumchars].wMain = static_cast<uint16_t>(pResultSet->get_unsigned32(14));
-        CharList[cNumchars].wSub = static_cast<uint16_t>(pResultSet->get_unsigned32(15));
-        cNumchars++;
-        if (cNumchars >= mcNumCharsAllowed) {
+        dwCurrentContentID = pResultSet->get_unsigned32(0);
+        // The character's position in the list must match the content id which is already set-up
+        // so we'll need to search for it.
+        for (j = 0; j < mcNumCharsAllowed; j++) {
+            if (mCharacters[j].dwContentID == dwCurrentContentID) {
+                break;
+            }
+        }
+        if (j >= mcNumCharsAllowed) {
+            LOG_WARNING("Account has a character without a valid matching content ID, this character will be skipped.");
+            continue;
+        }
+        mCharacters[j].dwCharacterID = pResultSet->get_unsigned32(1);
+        strncpy(mCharacters[j].szCharName, pResultSet->get_string(2).c_str(), sizeof(mCharacters[i].szCharName));
+        mCharacters[j].cWorldID = static_cast<uint8_t>(pResultSet->get_unsigned32(3));
+        mCharacters[j].cMainJob = static_cast<uint8_t>(pResultSet->get_unsigned32(4));
+        mCharacters[j].cMainJobLevel = static_cast<uint8_t>(pResultSet->get_unsigned32(5));
+        mCharacters[j].wZone = static_cast<uint16_t>(pResultSet->get_unsigned32(6));
+        mCharacters[j].cRace = static_cast<uint8_t>(pResultSet->get_unsigned32(7));
+        mCharacters[j].cFace = static_cast<uint8_t>(pResultSet->get_unsigned32(8));
+        mCharacters[j].cHair = static_cast<uint8_t>(pResultSet->get_unsigned32(9));
+        mCharacters[j].wHead = static_cast<uint16_t>(pResultSet->get_unsigned32(10));
+        mCharacters[j].wBody = static_cast<uint16_t>(pResultSet->get_unsigned32(11));
+        mCharacters[j].wHands = static_cast<uint16_t>(pResultSet->get_unsigned32(12));
+        mCharacters[j].wLegs = static_cast<uint16_t>(pResultSet->get_unsigned32(13));
+        mCharacters[j].wFeet = static_cast<uint16_t>(pResultSet->get_unsigned32(14));
+        mCharacters[j].wMain = static_cast<uint16_t>(pResultSet->get_unsigned32(15));
+        mCharacters[j].wSub = static_cast<uint16_t>(pResultSet->get_unsigned32(16));
+        mCharacters[j].cSize = static_cast<uint8_t>(pResultSet->get_unsigned32(17));
+        mCharacters[j].cNation = static_cast<uint8_t>(pResultSet->get_unsigned32(18));
+        i++;
+        if (i >= mcNumCharsAllowed) {
             // Safeguard just in case the DB has more chars than allowed
             break;
         }
+        mcNumCharacters++;
     }
     mbCharListLoaded = true;
     LOG_DEBUG1("Character list loaded.");
@@ -277,29 +304,34 @@ void LoginSession::SetViewServerFinished()
     mbViewServerFinished = true;
 }
 
-std::shared_ptr<uint8_t> LoginSession::GetMessageFromMQ()
+std::shared_ptr<uint8_t> LoginSession::GetMessageFromMQ(uint8_t* pSendingWorld)
 {
     std::shared_ptr<uint8_t> pMessage(mpMessageFromMQ);
+    if (pSendingWorld) {
+        *pSendingWorld = mcMQMessageOriginatingWorld;
+    }
     mpMessageFromMQ = NULL;
     return pMessage;
 }
 
-void LoginSession::SendMQMessageToViewServer(std::shared_ptr<uint8_t> pMQMessage)
+void LoginSession::SendMQMessageToViewServer(std::shared_ptr<uint8_t> pMQMessage, uint8_t cSendingWorld)
 {
+    LOCK_SESSION;
     if (mpMessageFromMQ != NULL) {
         LOG_ERROR("Message sent to session before the previous was read.");
         throw std::runtime_error("Message sent too quickly.");
     }
     mpMessageFromMQ = pMQMessage;
+    mcMQMessageOriginatingWorld = cSendingWorld;
 }
 
-bool LoginSession::IsCharacterAssociatedWithSession(uint32_t dwCharacterID)
+bool LoginSession::IsCharacterAssociatedWithSession(uint32_t dwCharacterID, uint8_t cWorldID)
 {
     uint8_t i = 0;
 
     LOCK_SESSION;
-    for (i = 0; i < mcNumCharacters; i++) {
-        if (mCharacters[i].dwCharacterID == dwCharacterID) {
+    for (i = 0; i < mcNumCharsAllowed; i++) {
+        if ((mCharacters[i].dwCharacterID == dwCharacterID) && (mCharacters[i].cWorldID == cWorldID)) {
             return true;
         }
     }
