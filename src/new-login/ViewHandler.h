@@ -199,6 +199,56 @@ private:
      */
     void CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID);
 
+    /**
+     *  Create new character ID for a new character and associate it with a
+     *  given content ID.
+     *  @param pRequestPacket Request packet as sent by the client
+     */
+    void PrepareNewCharacter(const CREATE_REQUEST_PACKET* pRequestPacket);
+
+    /**
+     *  Called after a response from the world server,
+     *  completes the reservation of a new character.
+     *  @param pMQMessage The raw MQ message
+     *  @param cWorldID The world ID of the origin
+     */
+    void CompletePrepareNewChar(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID);
+
+    /**
+     *  Set up all details for a new character and notify world server to confirm
+     *  character creation.
+     *  @param pRequestPacket Request packet as sent by the client
+     */
+    void ConfirmNewCharacter(const CONFIRM_CREATE_REQUEST_PACKET* pRequestPacket);
+
+    /**
+     *  Called after a response from the world server,
+     *  completes the creation of a new character.
+     *  @param pMQMessage The raw MQ message
+     *  @param cWorldID The world ID of the origin
+     */
+    void CompleteConfirmNewCharacter(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID);
+
+    /**
+     *  Delete an existing character from the user's account and free the content ID
+     *  @param pRequestPacket Request packet as sent by the client
+     */
+    void DeleteCharacter(const DELETE_REQUEST_PACKET* pRequestPacket);
+
+    /**
+     *  Called after a response from the world server,
+     *  completes the deletion of a character.
+     *  @param pMQMessage The raw MQ message
+     *  @param cWorldID The world ID of the origin
+     */
+    void CompleteDeleteCharacter(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID);
+
+    /**
+     *  Clean any half-created characters from DB (i.e. characters that were reserved
+     *  but whose creation process was not successfully completed.
+     */
+    void CleanHalfCreatedCharacters();
+
     /// FFXI Packet parser
     FFXIPacket mParser;
     /// Associated session

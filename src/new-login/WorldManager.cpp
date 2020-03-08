@@ -81,6 +81,37 @@ std::string WorldManager::GetWorldName(uint32_t dwWorldID)
     return std::string(WorldEnt->second.szWorldName);
 }
 
+uint32_t WorldManager::GetWorldIDByName(const char* szWorldName)
+{
+    if (!mbWorldListLoaded) {
+        LOG_INFO("World list not loaded yet, trying to load now.");
+        LoadWorlds();
+    }
+    LOCK_WORLDMGR;
+    for (auto it = mmapWorldList.begin(); it != mmapWorldList.end(); it++) {
+        if (strcmp(it->second.szWorldName, szWorldName) == 0) {
+            return it->first;
+        }
+    }
+    LOG_ERROR("World name did not match any known world.");
+    throw std::runtime_error("World name not found.");
+}
+
+bool WorldManager::IsTestWorld(uint32_t dwWorldID)
+{
+    if (!mbWorldListLoaded) {
+        LOG_INFO("World list not loaded yet, trying to load now.");
+        LoadWorlds();
+    }
+    LOCK_WORLDMGR;
+    auto pWorldEnt = mmapWorldList.find(dwWorldID);
+    if (pWorldEnt != mmapWorldList.end()) {
+        LOG_ERROR("World ID not found in list.");
+        throw std::runtime_error("World ID not found.");
+    }
+    return pWorldEnt->second.bIsTestWorld;
+}
+
 std::shared_ptr<uint8_t> WorldManager::GetAdminWorldsPacket()
 {
     if (!mbWorldListLoaded) {

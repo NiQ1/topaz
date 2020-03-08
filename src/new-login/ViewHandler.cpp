@@ -102,6 +102,17 @@ void ViewHandler::Run()
                 case FFXIPacket::FFXI_TYPE_LOGIN_REQUEST:
                     HandleLoginRequest(reinterpret_cast<LOGIN_REQUEST_PACKET*>(pPayloadData));
                     break;
+                case FFXIPacket::FFXI_TYPE_CREATE_CHARACTER:
+                    PrepareNewCharacter(reinterpret_cast<CREATE_REQUEST_PACKET*>(pPayloadData));
+                    break;
+                case FFXIPacket::FFXI_TYPE_CREATE_CHAR_CONFIRM:
+                    ConfirmNewCharacter(reinterpret_cast<CONFIRM_CREATE_REQUEST_PACKET*>(pPayloadData));
+                    break;
+                case FFXIPacket::FFXI_TYPE_DELETE_CHARACTER:
+                    DeleteCharacter(reinterpret_cast<DELETE_REQUEST_PACKET*>(pPayloadData));
+                    break;
+                default:
+                    LOG_WARNING("Received an unknown packet type from client, ignoring.");
                 }
             }
 
@@ -134,8 +145,17 @@ void ViewHandler::Run()
                 case MQConnection::MQ_MESSAGE_CHAR_LOGIN_ACK:
                     CompleteLoginRequest(pMessageFromMQ, cOrigin);
                     break;
+                case MQConnection::MQ_MESSAGE_CHAR_RESERVE_ACK:
+                    CompletePrepareNewChar(pMessageFromMQ, cOrigin);
+                    break;
+                case MQConnection::MQ_MESSAGE_CHAR_CREATE_ACK:
+                    CompleteConfirmNewCharacter(pMessageFromMQ, cOrigin);
+                    break;
+                case MQConnection::MQ_MESSAGE_CHAR_DELETE_ACK:
+                    CompleteDeleteCharacter(pMessageFromMQ, cOrigin);
                 default:
                     LOG_ERROR("Invalid message received from world server.");
+                    mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
                     throw std::runtime_error("MQ message type unknown.");
                 }
             }
@@ -143,6 +163,7 @@ void ViewHandler::Run()
             // Maybe we've timed out
             if ((mtmOperationTimeout != 0) && (time(NULL) >= mtmOperationTimeout)) {
                 LOG_ERROR("Timed out waiting for a reply from the world server.");
+                mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
                 throw std::runtime_error("World server response timeout.");
             }
         }
@@ -218,6 +239,8 @@ void ViewHandler::SendCharacterList()
 
     LOCK_SESSION;
     VIEW_PACKET_CHARACTER_LIST CharListPacket = { 0 };
+    // Clear any previously reserved but not created characters
+    CleanHalfCreatedCharacters();
     // Load character list from DB into session
     mpSession->LoadCharacterList();
     uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
@@ -300,6 +323,7 @@ void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
     // Notify the world server that a character wants to log in
     CharMessageHnd::MESSAGE_LOGIN_REQUEST LoginMessage;
     LoginMessage.Header.eType = MQConnection::MQ_MESSAGE_CHAR_LOGIN;
+    LoginMessage.Header.dwContentID = pRequestPacket->dwContentID;
     LoginMessage.Header.dwCharacterID = pRequestPacket->dwCharacterID;
     LoginMessage.Header.dwAccountID = mpSession->GetAccountID();
     memcpy(&LoginMessage.bufInitialKey, bufKey, sizeof(LoginMessage.bufInitialKey));
@@ -345,11 +369,22 @@ void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint
     // Do some sanity on the message we got
     if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_LOGIN_ACK) ||
         (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
-        (mpSession->IsCharacterAssociatedWithSession(pResponseMessage->Header.dwCharacterID, cWorldID))) {
+        (mpSession->IsContentIDAssociatedWithSession(pResponseMessage->Header.dwContentID) == 0)) {
         // From the client's point of view this is a communication error with the map server
         LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
         mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Login response detail mismatch.");
+    }
+    CharMessageHnd::CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
+        LOG_ERROR("Character ID does not match content ID.");
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Char id / content id mismatch.");
+    }
+    if (pResponseMessage->dwResponseCode != 0) {
+        LOG_ERROR("Server rejected login request.");
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Login request rejected.");
     }
     // Send the map server details to client
     LOGIN_CONFIRM_PACKET ConfirmPacket = { 0 };
@@ -368,4 +403,292 @@ void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint
     // At this point the client should switch to the zone server, our job's
     // done so drop the connection.
     mbShutdown = true;
+}
+
+void ViewHandler::PrepareNewCharacter(const CREATE_REQUEST_PACKET* pRequestPacket)
+{
+    LOG_DEBUG0("Called.");
+    // This will throw if the client attempts to use a content ID not associated with its account
+    CharMessageHnd::CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
+    // Do some sanity checks on the content
+    if (!pNewChar->bEnabled) {
+        LOG_ERROR("Cannot create a new character using a disabled content ID.");
+        throw std::runtime_error("Content ID is disabled.");
+    }
+    if (pNewChar->dwCharacterID != 0) {
+        LOG_ERROR("Content ID already associated with a character.");
+        throw std::runtime_error("Content ID not free.");
+    }
+    // The client sends the world name rather than world ID so look it up
+    WorldManagerPtr WorldMgr = WorldManager::GetInstance();
+    uint32_t dwWorldID = WorldMgr->GetWorldIDByName(pRequestPacket->szWorldName);
+    LOCK_SESSION;
+    // Prevent unprivileges users from creating characters in test worlds by editing
+    // the world name in memory.
+    if ((WorldMgr->IsTestWorld(dwWorldID)) && ((mpSession->GetPrivilegesBitmask() & Authentication::ACCT_PRIV_HAS_TEST_ACCESS) == 0)) {
+        LOG_ERROR("Unprivileged user attempted to create a character on a test world.");
+        throw std::runtime_error("User cannot create characters on test worlds.");
+    }
+    DBConnection DB = Database::GetDatabase();
+    LOCK_DB;
+    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    // We will need a unique character ID (for the given world), so just pick the existing
+    // max charid + 1
+    uint32_t dwNewCharID = 0;
+    std::string strSqlQueryFmt("SELECT MAX(character_id) FROM %schars WHERE world_id=%d;");
+    std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
+        Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+        dwWorldID));
+    mariadb::result_set_ref pResultSet = DB->query(strSqlFinalQuery);
+    if (pResultSet->row_count() == 0) {
+        // First character being created in this world. Seems that on retail the higher word
+        // of the char ID is actually the world id, giving some sort of uniqueness.
+        dwNewCharID = (dwWorldID << 16) + 1;
+    }
+    else {
+        pResultSet->next();
+        dwNewCharID = pResultSet->get_unsigned32(0) + 1;
+    }
+    // Save a stub (all zeros) to the database to reserve the character ID but don't do much more
+    pNewChar->bEnabled = true;
+    pNewChar->cFace = 0;
+    pNewChar->cHair = 0;
+    pNewChar->cMainJob = 0;
+    pNewChar->cMainJobLevel = 0;
+    pNewChar->cNation = 0;
+    pNewChar->cRace = 0;
+    pNewChar->cSize = 0;
+    pNewChar->cWorldID = static_cast<uint8_t>(dwWorldID);
+    pNewChar->dwCharacterID = dwNewCharID;
+    pNewChar->dwContentID = pRequestPacket->dwContentID;
+    strncpy(pNewChar->szCharName, pRequestPacket->szCharacterName, sizeof(pNewChar->szCharName));
+    pNewChar->wBody = 0;
+    pNewChar->wFeet = 0;
+    pNewChar->wHands = 0;
+    pNewChar->wHead = 0;
+    pNewChar->wLegs = 0;
+    pNewChar->wMain = 0;
+    pNewChar->wSub = 0;
+    pNewChar->wZone = 0;
+    // Send a request to the world server to reserve the character ID / name.
+    // We will proceed once the world server confirms (this happens asynchronically)
+    LOCK_WORLDMGR;
+    CharMessageHnd::MESSAGE_CREATE_REQUEST CreateChar;
+    CreateChar.Header.dwAccountID = mpSession->GetAccountID();
+    CreateChar.Header.dwCharacterID = dwNewCharID;
+    CreateChar.Header.eType = MQConnection::MQ_MESSAGE_CHAR_RESERVE;
+    CreateChar.Header.dwContentID = pRequestPacket->dwContentID;
+    strncpy(CreateChar.szCharName, pRequestPacket->szCharacterName, sizeof(CreateChar.szCharName) - 1);
+    WorldManager::GetInstance()->SendMessageToWorld(dwWorldID, reinterpret_cast<uint8_t*>(&CreateChar), sizeof(CreateChar));
+    mtmOperationTimeout = time(NULL) + WORLD_SERVER_REPLY_TIMEOUT;
+}
+
+void ViewHandler::CompletePrepareNewChar(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID)
+{
+    LOG_DEBUG0("Called.");
+    CharMessageHnd::MESSAGE_GENERIC_RESPONSE* pResponseMessage = reinterpret_cast<CharMessageHnd::MESSAGE_GENERIC_RESPONSE*>(pMQMessage.get());
+    // Do some sanity on the message we got
+    if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_RESERVE_ACK) ||
+        (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
+        (mpSession->IsContentIDAssociatedWithSession(pResponseMessage->Header.dwContentID) == 0)) {
+        // From the client's point of view this is a communication error with the map server
+        LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
+        CleanHalfCreatedCharacters();
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Prepare response detail mismatch.");
+    }
+    CharMessageHnd::CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
+        LOG_ERROR("Character ID does not match content ID.");
+        CleanHalfCreatedCharacters();
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Char id / content id mismatch.");
+    }
+    if (pResponseMessage->dwResponseCode != 0) {
+        LOG_ERROR("Server rejected reserve request.");
+        CleanHalfCreatedCharacters();
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Reserve request rejected.");
+    }
+    mParser.SendDone();
+    mtmOperationTimeout = 0;
+}
+
+void ViewHandler::ConfirmNewCharacter(const CONFIRM_CREATE_REQUEST_PACKET* pRequestPacket)
+{
+    LOG_DEBUG0("Called.");
+
+    CharMessageHnd::CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
+    if ((!pNewChar->bEnabled) || (pNewChar->cNation != 0)) {
+        LOG_ERROR("Character slot invalid or already taken.");
+        CleanHalfCreatedCharacters();
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Invalid character slot.");
+    }
+    // Fill in all character data. The gear data is purely used for login screen visuals so we
+    // don't mind taking it from whatever the client sent us (won't affect other people).
+    pNewChar->cFace = pRequestPacket->Details.cFace;
+    pNewChar->cHair = pRequestPacket->Details.cHair;
+    pNewChar->cSize = pRequestPacket->Details.cSize;
+    pNewChar->wBody = pRequestPacket->Details.wBody;
+    pNewChar->wFeet = pRequestPacket->Details.wFeet;
+    pNewChar->wHands = pRequestPacket->Details.wHands;
+    pNewChar->wHead = pRequestPacket->Details.wHead;
+    pNewChar->wLegs = pRequestPacket->Details.wLegs;
+    pNewChar->wMain = pRequestPacket->Details.wMain;
+    pNewChar->wSub = pRequestPacket->Details.wSub;
+    if ((pRequestPacket->Details.cMainJob < 1) || (pRequestPacket->Details.cMainJob > 6)) {
+        // Prevent the user from using packet injection in order to select an advanced
+        // job as the starting job.
+        LOG_WARNING("User attempted to select a non-basic job as a start job.");
+        // Just force is to a default value (WAR)
+        pNewChar->cMainJob = 1;
+    }
+    else {
+        pNewChar->cMainJob = pRequestPacket->Details.cMainJob;
+    }
+    // We don't care about what level you say you are, you always start as level 1
+    pNewChar->cMainJobLevel = 1;
+    pNewChar->cRace = pRequestPacket->Details.cRace;
+    pNewChar->cNation = pRequestPacket->Details.cNation;
+    // 0 == no zone (character just been created)
+    pNewChar->wZone = 0;
+    CharMessageHnd::MESSAGE_CONFIRM_CREATE_REQUEST ConfirmRequest;
+    ConfirmRequest.Header.eType = MQConnection::MQ_MESSAGE_CHAR_CREATE;
+    ConfirmRequest.Header.dwAccountID = mpSession->GetAccountID();
+    ConfirmRequest.Header.dwContentID = pNewChar->dwContentID;
+    ConfirmRequest.Header.dwCharacterID = pNewChar->dwCharacterID;
+    // Get the world server's confirmation before committing to DB
+    LOCK_WORLDMGR;
+    WorldManager::GetInstance()->SendMessageToWorld(pNewChar->cWorldID, reinterpret_cast<uint8_t*>(&ConfirmRequest), sizeof(ConfirmRequest));
+    mtmOperationTimeout = time(NULL) + WORLD_SERVER_REPLY_TIMEOUT;
+}
+
+void ViewHandler::CompleteConfirmNewCharacter(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID)
+{
+    LOG_DEBUG0("Called.");
+    CharMessageHnd::MESSAGE_CONFIRM_CREATE_RESPONSE* pResponseMessage = reinterpret_cast<CharMessageHnd::MESSAGE_CONFIRM_CREATE_RESPONSE*>(pMQMessage.get());
+    // Do some sanity on the message we got
+    if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_CREATE_ACK) ||
+        (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
+        (mpSession->IsContentIDAssociatedWithSession(pResponseMessage->Header.dwContentID) == 0)) {
+        // From the client's point of view this is a communication error with the map server
+        LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
+        CleanHalfCreatedCharacters();
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Confirm response detail mismatch.");
+    }
+    CharMessageHnd::CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
+        LOG_ERROR("Character ID does not match content ID.");
+        CleanHalfCreatedCharacters();
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Char id / content id mismatch.");
+    }
+    if (pResponseMessage->dwResponseCode != 0) {
+        LOG_ERROR("Server rejected confirm request.");
+        CleanHalfCreatedCharacters();
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Confirm request rejected.");
+    }
+    // Commit the new character details to DB
+    CharMessageHnd::CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    CharMessageHnd::UpdateCharacter(pNewChar);
+    // Note: Successful completion of the creation process does not auto-login the user,
+    // the client will request an updated character list and will then issue a login command.
+    mParser.SendDone();
+    mtmOperationTimeout = 0;
+}
+
+void ViewHandler::DeleteCharacter(const DELETE_REQUEST_PACKET* pRequestPacket)
+{
+    LOG_DEBUG0("Called.");
+    CharMessageHnd::CHARACTER_ENTRY* pDelChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
+    if (pDelChar->dwCharacterID != pRequestPacket->dwCharacterID) {
+        LOG_ERROR("Character ID / Content ID mismatch.");
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Character ID / Content ID mismatch.");
+    }
+    // Basically just pass the request to the world server. We'll only do the deletion
+    // once the world server confirms.
+    // Note: Using CHAR_MQ_MESSAGE_HEADER because it has no arguments other than the header
+    CharMessageHnd::CHAR_MQ_MESSAGE_HEADER DeleteRequest;
+    DeleteRequest.eType = MQConnection::MQ_MESSAGE_CHAR_DELETE;
+    DeleteRequest.dwAccountID = mpSession->GetAccountID();
+    DeleteRequest.dwContentID = pRequestPacket->dwContentID;
+    DeleteRequest.dwCharacterID = pDelChar->dwCharacterID;
+    LOCK_WORLDMGR;
+    WorldManager::GetInstance()->SendMessageToWorld(pDelChar->cWorldID, reinterpret_cast<uint8_t*>(&DeleteRequest), sizeof(DeleteRequest));
+    mtmOperationTimeout = time(NULL) + WORLD_SERVER_REPLY_TIMEOUT;
+}
+
+void ViewHandler::CompleteDeleteCharacter(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID)
+{
+    LOG_DEBUG0("Called.");
+    CharMessageHnd::MESSAGE_GENERIC_RESPONSE* pResponseMessage = reinterpret_cast<CharMessageHnd::MESSAGE_GENERIC_RESPONSE*>(pMQMessage.get());
+    // Do some sanity on the message we got
+    if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_DELETE_ACK) ||
+        (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
+        (mpSession->IsContentIDAssociatedWithSession(pResponseMessage->Header.dwContentID) == 0)) {
+        // From the client's point of view this is a communication error with the map server
+        LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Delete response detail mismatch.");
+    }
+    CharMessageHnd::CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
+        LOG_ERROR("Character ID does not match content ID.");
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Char id / content id mismatch.");
+    }
+    if (pResponseMessage->dwResponseCode != 0) {
+        LOG_ERROR("Server rejected delete request.");
+        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        throw std::runtime_error("Delete request rejected.");
+    }
+    // Remove the character from DB and session
+    LOCK_DB;
+    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    DBConnection DB = Database::GetDatabase();
+    std::string strSqlQueryFmt("DELETE FROM %schars WHERE content_id=%d;");
+    std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
+        Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+        pResponseMessage->Header.dwContentID));
+    DB->execute(strSqlFinalQuery);
+    // Also remove from session so the client will see this entry as free on the next character list update
+    pCharEntry->cFace = 0;
+    pCharEntry->cHair = 0;
+    pCharEntry->cMainJob = 0;
+    pCharEntry->cMainJobLevel = 0;
+    pCharEntry->cNation = 0;
+    pCharEntry->cRace = 0;
+    pCharEntry->cSize = 0;
+    pCharEntry->cWorldID = 0;
+    pCharEntry->dwCharacterID = 0;
+    memset(pCharEntry->szCharName, 0, sizeof(pCharEntry->szCharName));
+    pCharEntry->szCharName[0] = ' ';
+    pCharEntry->wBody = 0;
+    pCharEntry->wFeet = 0;
+    pCharEntry->wHands = 0;
+    pCharEntry->wHead = 0;
+    pCharEntry->wLegs = 0;
+    pCharEntry->wMain = 0;
+    pCharEntry->wSub = 0;
+    pCharEntry->wZone = 0;
+    mParser.SendDone();
+    mtmOperationTimeout = 0;
+}
+
+void ViewHandler::CleanHalfCreatedCharacters()
+{
+    LOG_DEBUG0("Called.");
+    LOCK_DB;
+    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    DBConnection DB = Database::GetDatabase();
+    std::string strSqlQueryFmt("DELETE FROM %schars WHERE nation=0 AND content_id IN (SELECT content_id FROM %scontents WHERE account_id=%d);");
+    std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
+        Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+        Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
+        mpSession->GetAccountID()));
+    DB->execute(strSqlFinalQuery);
 }

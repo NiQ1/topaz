@@ -35,6 +35,20 @@ public:
     std::string GetWorldName(uint32_t dwWorldID);
 
     /**
+     *  Return the World ID matching a given world name
+     *  @param szWorldName World name to look up
+     *  @return World ID
+     */
+    uint32_t GetWorldIDByName(const char* szWorldName);
+
+    /**
+     *  Check if a given world is marked as a test world
+     *  @param dwWorldID World ID to look up
+     *  @return true if world is test, false if not
+     */
+    bool IsTestWorld(uint32_t dwWorldID);
+
+    /**
      *  Send a message to the MQ server of a world given its ID
      *  @param dwWorldID World ID of the target world
      *  @param bufMessage Message to send

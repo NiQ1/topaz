@@ -192,7 +192,14 @@ public:
      *  @param cOffset Offset in the character list
      *  @return Character entry struct with character data
      */
-    const CharMessageHnd::CHARACTER_ENTRY* GetCharacter(uint8_t cOffset);
+    CharMessageHnd::CHARACTER_ENTRY* GetCharacter(uint8_t cOffset);
+
+    /**
+     *  Get a character entry struct given a content ID
+     *  @param dwContentID Content ID of the needed character
+     *  @return Character entry struct with character data
+     */
+    CharMessageHnd::CHARACTER_ENTRY* GetCharacterByContentID(uint32_t dwContentID);
 
     /**
      *  Internal requests sent to the data server
@@ -266,6 +273,14 @@ public:
      *  @return True if associated with this session, false otherwise
      */
     bool IsCharacterAssociatedWithSession(uint32_t dwCharacterID, uint8_t cWorldID);
+
+    /**
+     *  Check whether a given content ID is associated with the account
+     *  being processed in this session.
+     *  @param dwContentID Content ID to check
+     *  @return True if associated with this session, false otherwise
+     */
+    bool IsContentIDAssociatedWithSession(uint32_t dwContentID);
 
 private:
     // Account ID received from authentication

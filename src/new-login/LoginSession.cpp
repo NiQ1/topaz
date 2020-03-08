@@ -98,7 +98,7 @@ uint8_t LoginSession::GetNumCharsAllowed() const
     return mcNumCharsAllowed;
 }
 
-const CharMessageHnd::CHARACTER_ENTRY* LoginSession::GetCharacter(uint8_t cOffset)
+CharMessageHnd::CHARACTER_ENTRY* LoginSession::GetCharacter(uint8_t cOffset)
 {
     if (!mbCharListLoaded) {
         LOG_ERROR("Attempted to access character data before loading from DB.");
@@ -336,4 +336,32 @@ bool LoginSession::IsCharacterAssociatedWithSession(uint32_t dwCharacterID, uint
         }
     }
     return false;
+}
+
+bool LoginSession::IsContentIDAssociatedWithSession(uint32_t dwContentID)
+{
+    uint8_t i = 0;
+
+    LOCK_SESSION;
+    for (i = 0; i < mcNumCharsAllowed; i++) {
+        if (mCharacters[i].dwContentID == dwContentID) {
+            return true;
+        }
+    }
+    return false;
+}
+
+CharMessageHnd::CHARACTER_ENTRY* LoginSession::GetCharacterByContentID(uint32_t dwContentID)
+{
+    if (!mbCharListLoaded) {
+        LOG_ERROR("Attempted to access character data before loading from DB.");
+        throw std::runtime_error("Character data not available");
+    }
+    for (uint8_t i = 0; i < mcNumCharsAllowed; i++) {
+        if (mCharacters[i].dwContentID == dwContentID) {
+            return &mCharacters[i];
+        }
+    }
+    LOG_ERROR("Content ID did not match any character.");
+    throw std::runtime_error("No character matched content ID.");
 }

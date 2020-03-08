@@ -121,3 +121,11 @@ void FFXIPacket::SendError(FFXI_ERROR_CODES ErrorCode)
     ErrorPacket.dwZero = 0;
     SendPacket(FFXI_TYPE_ERROR, reinterpret_cast<uint8_t*>(&ErrorPacket), sizeof(ErrorPacket));
 }
+
+void FFXIPacket::SendDone()
+{
+    LOG_DEBUG1("Sending done packet.");
+    // Body is 4 bytes, meaning is unknown
+    uint32_t dwBody = 0;
+    SendPacket(FFXI_TYPE_DONE, reinterpret_cast<uint8_t*>(&dwBody), sizeof(dwBody));
+}

@@ -127,6 +127,11 @@ public:
      */
     void SendError(FFXI_ERROR_CODES ErrorCode);
 
+    /**
+     *  Send a success message
+     */
+    void SendDone();
+
 #pragma pack(push, 1)
     /**
      *  Structure of an error packet payload
