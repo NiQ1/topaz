@@ -12,7 +12,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <memory>
-#include "MQConnection.h"
+#include "new-common/MQConnection.h"
 
 // Easy way to lock the config mutex
 #define LOCK_WORLDMGR std::lock_guard<std::recursive_mutex> l_worldmgr(*WorldManager::GetMutex())

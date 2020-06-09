@@ -6,7 +6,7 @@
  */
 
 #include "ProtocolHandler.h"
-#include "Debugging.h"
+#include "new-common/Debugging.h"
 
 ProtocolHandler::ProtocolHandler(std::shared_ptr<TCPConnection> connection) : mpConnection(connection)
 {

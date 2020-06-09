@@ -6,7 +6,7 @@
  */
 
 #include "SessionTracker.h"
-#include "Debugging.h"
+#include "new-common/Debugging.h"
 #include <stdexcept>
 #include <time.h>
 

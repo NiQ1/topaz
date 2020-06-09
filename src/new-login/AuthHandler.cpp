@@ -6,9 +6,9 @@
  */
 
 #include "AuthHandler.h"
-#include "Debugging.h"
+#include "new-common/Debugging.h"
 #include "Authentication.h"
-#include "GlobalConfig.h"
+#include "LoginGlobalConfig.h"
 #include <thread>
 #include <chrono>
 
@@ -38,7 +38,7 @@ void AuthHandler::Run()
     // Whether authentication has succeeded
     bool bSuccess = false;
     // Number of allowed login attempts before the user is disconnected
-    uint32_t dwMaxLoginAttempts = GlobalConfig::GetInstance()->GetConfigUInt("max_login_attempts");
+    uint32_t dwMaxLoginAttempts = LoginGlobalConfig::GetInstance()->GetConfigUInt("max_login_attempts");
 
     LOG_DEBUG0("Called.");
     mbRunning = true;

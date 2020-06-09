@@ -8,8 +8,8 @@
 #ifndef FFXI_LOGIN_CHARMESSAGEHND_H
 #define FFXI_LOGIN_CHARMESSAGEHND_H
 
-#include "MQHandler.h"
-#include "MQConnection.h"
+#include "new-common/MQHandler.h"
+#include "new-common/MQConnection.h"
 
 /**
  *  Character message handler. Supports creation, login and update.

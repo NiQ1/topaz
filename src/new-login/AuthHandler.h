@@ -9,7 +9,7 @@
 #define FFXI_LOGIN_AUTHHANDLER_H
 
 #include "ProtocolHandler.h"
-#include "TCPConnection.h"
+#include "new-common/TCPConnection.h"
 
  /**
  *  Login handler class, create an object for each connecting client.

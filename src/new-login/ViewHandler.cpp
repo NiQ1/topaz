@@ -6,13 +6,13 @@
  */
 
 #include <mariadb++/connection.hpp>
-#include "Database.h"
+#include "new-common/Database.h"
 #include "ViewHandler.h"
-#include "Debugging.h"
+#include "new-common/Debugging.h"
 #include "SessionTracker.h"
-#include "GlobalConfig.h"
+#include "LoginGlobalConfig.h"
 #include "WorldManager.h"
-#include "Utilities.h"
+#include "new-common/Utilities.h"
 #include "Authentication.h"
 #include <time.h>
 
@@ -186,7 +186,7 @@ void ViewHandler::CheckVersionAndSendFeatures(const uint8_t* pRequestPacket)
     // interest to us is the version number, which is at offset 88
     std::string strClientVersion(reinterpret_cast<const char*>(pRequestPacket + 88), 10);
     LOG_DEBUG1("Client version: %s", strClientVersion.c_str());
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
     uint32_t dwVersionLock = Config->GetConfigUInt("version_lock");
     std::string strExpectedVersion(Config->GetConfigString("expected_client_version"));
     if ((dwVersionLock == 1) && (strClientVersion != strExpectedVersion)) {
@@ -431,7 +431,7 @@ void ViewHandler::PrepareNewCharacter(const CREATE_REQUEST_PACKET* pRequestPacke
     }
     DBConnection DB = Database::GetDatabase();
     LOCK_DB;
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
     // We will need a unique character ID (for the given world), so just pick the existing
     // max charid + 1
     uint32_t dwNewCharID = 0;
@@ -648,7 +648,7 @@ void ViewHandler::CompleteDeleteCharacter(std::shared_ptr<uint8_t> pMQMessage, u
     }
     // Remove the character from DB and session
     LOCK_DB;
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
     DBConnection DB = Database::GetDatabase();
     std::string strSqlQueryFmt("DELETE FROM %schars WHERE content_id=%d;");
     std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
@@ -683,7 +683,7 @@ void ViewHandler::CleanHalfCreatedCharacters()
 {
     LOG_DEBUG0("Called.");
     LOCK_DB;
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
     DBConnection DB = Database::GetDatabase();
     std::string strSqlQueryFmt("DELETE FROM %schars WHERE nation=0 AND content_id IN (SELECT content_id FROM %scontents WHERE account_id=%d);");
     std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,

@@ -6,11 +6,11 @@
  */
 
 #include "LoginSession.h"
-#include "Debugging.h"
+#include "new-common/Debugging.h"
 #include <mariadb++/connection.hpp>
-#include "Database.h"
-#include "GlobalConfig.h"
-#include "Utilities.h"
+#include "new-common/Database.h"
+#include "LoginGlobalConfig.h"
+#include "new-common/Utilities.h"
 #include <string.h>
 
 #define LOCK_SESSION std::lock_guard<std::recursive_mutex> l_session(*GetMutex())
@@ -180,7 +180,7 @@ void LoginSession::LoadCharacterList()
     }
     LOCK_SESSION;
     DBConnection DB = Database::GetDatabase();
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
     LOCK_DB;
     LOCK_CONFIG;
 

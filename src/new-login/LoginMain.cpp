@@ -5,9 +5,9 @@
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#include "Debugging.h"
-#include "Database.h"
-#include "GlobalConfig.h"
+#include "new-common/Debugging.h"
+#include "new-common/Database.h"
+#include "LoginGlobalConfig.h"
 #include "WorldManager.h"
 #include "LoginServer.h"
 #include "ProtocolFactory.h"
@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
     srand(static_cast<unsigned int>(time(NULL)));
 
     // Load global configuration
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
     WorldManagerPtr WorldMgr = WorldManager::GetInstance();
     // Connect to database
     DatabasePtr DB = Database::Initialize(Config->GetConfigString("db_server").c_str(),

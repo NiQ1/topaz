@@ -7,7 +7,6 @@
 
 #include "MQConnection.h"
 #include "Debugging.h"
-#include "GlobalConfig.h"
 #include "TCPConnection.h"
 #include <stdexcept>
 #include <chrono>
@@ -51,7 +50,6 @@ MQConnection::MQConnection(uint32_t dwWorldId,
 {
     LOG_DEBUG0("Called.");
     madwSendersWaiting = 0;
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
 
     mConnection = amqp_new_connection();
     if (mConnection == NULL) {

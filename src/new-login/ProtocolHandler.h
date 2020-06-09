@@ -8,8 +8,8 @@
 #ifndef FFXI_LOGIN_PROTOCOLHANDLER_H
 #define FFXI_LOGIN_PROTOCOLHANDLER_H
 
-#include "TCPConnection.h"
-#include "Thread.h"
+#include "new-common/TCPConnection.h"
+#include "new-common/Thread.h"
 #include <thread>
 #include <memory>
 

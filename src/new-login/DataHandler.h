@@ -9,7 +9,7 @@
 #define FFXI_LOGIN_DATAHANDLER_H
 
 #include "ProtocolHandler.h"
-#include "TCPConnection.h"
+#include "new-common/TCPConnection.h"
 #include "LoginSession.h"
 #include <stdint.h>
 

@@ -7,10 +7,10 @@
 
 #include "CharMessageHnd.h"
 #include <mariadb++/connection.hpp>
-#include "Database.h"
-#include "Debugging.h"
-#include "GlobalConfig.h"
-#include "Utilities.h"
+#include "new-common/Database.h"
+#include "new-common/Debugging.h"
+#include "LoginGlobalConfig.h"
+#include "new-common/Utilities.h"
 #include "SessionTracker.h"
 
 #define MAX_CHAR_MESSAGE_SIZE 1048576
@@ -29,7 +29,7 @@ void CharMessageHnd::UpdateCharacter(CHARACTER_ENTRY* pNewDetails)
 {
     LOG_DEBUG0("Called.");
     DBConnection DB = Database::GetDatabase();
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
 
     LOCK_DB;
     // Check if the character exists and associated with the given content id
@@ -143,7 +143,7 @@ CharMessageHnd::CHARACTER_ENTRY CharMessageHnd::QueryCharacter(uint32_t dwCharac
 {
     LOG_DEBUG0("Called.");
     DBConnection DB = Database::GetDatabase();
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
 
     LOCK_DB;
     std::string strSqlQueryFmt("SELECT content_id, name, main_job, main_job_lv, zone, race, face, hair, head, body "
@@ -185,7 +185,7 @@ CharMessageHnd::CHARACTER_ENTRY CharMessageHnd::QueryCharacter(uint32_t dwConten
 {
     LOG_DEBUG0("Called.");
     DBConnection DB = Database::GetDatabase();
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
 
     LOCK_DB;
     std::string strSqlQueryFmt("SELECT character_id, name, world_id, main_job, main_job_lv, zone, race, face, hair, head "

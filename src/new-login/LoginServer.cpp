@@ -7,8 +7,8 @@
 
 #include "LoginServer.h"
 #include "AuthHandler.h"
-#include "Debugging.h"
-#include "GlobalConfig.h"
+#include "new-common/Debugging.h"
+#include "LoginGlobalConfig.h"
 #include "ProtocolFactory.h"
 #include "SessionTracker.h"
 #include "WorldManager.h"
@@ -107,7 +107,7 @@ void LoginServer::Run()
     // Counter of existing connections of connecting IP
     uint32_t dwNumConcurrent = 0;
     // Max number of concurrent connections a single client can have
-    uint32_t dwMaxConcurrent = GlobalConfig::GetInstance()->GetConfigUInt("max_client_connections");
+    uint32_t dwMaxConcurrent = LoginGlobalConfig::GetInstance()->GetConfigUInt("max_client_connections");
     // Session tracker
     SessionTrackerPtr Sessions = SessionTracker::GetInstance();
     // Whether to reject the latest connection

@@ -17,9 +17,6 @@
 // Easy way to lock the config mutex
 #define LOCK_CONFIG std::lock_guard<std::recursive_mutex> l_config(*GlobalConfig::GetMutex())
 
- // Default configuration file name
-#define DEFAULT_CONFIG_FILE_NAME "login.conf"
-
 class GlobalConfig;
 typedef GlobalConfig* GlobalConfigPtr;
 
@@ -35,42 +32,42 @@ public:
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    std::string GetConfigString(const std::string& strConfigName);
+    virtual std::string GetConfigString(const std::string& strConfigName);
 
     /**
      *  Get a string type configuration value.
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    std::string GetConfigString(const char* pszConfigName);
+    virtual std::string GetConfigString(const char* pszConfigName);
 
     /**
      *  Get an interger type configuration value.
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    int32_t GetConfigInt(const std::string& strConfigName);
+    virtual int32_t GetConfigInt(const std::string& strConfigName);
 
     /**
      *  Get an interger type configuration value.
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    int32_t GetConfigInt(const char* pszConfigName);
+    virtual int32_t GetConfigInt(const char* pszConfigName);
 
     /**
      *  Get an unsigned interger type configuration value.
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    uint32_t GetConfigUInt(const std::string& strConfigName);
+    virtual uint32_t GetConfigUInt(const std::string& strConfigName);
 
     /**
      *  Get an unsigned interger type configuration value.
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    uint32_t GetConfigUInt(const char* pszConfigName);
+    virtual uint32_t GetConfigUInt(const char* pszConfigName);
 
     /**
      *  Get an instance of the configuration. The object is created
@@ -84,7 +81,7 @@ public:
      *  On sequent calls this argument is ignored.
      *  @param strConfigFileName Name of the configuration file
      */
-    static GlobalConfigPtr GetInstance(std::string& strConfigFileName);
+    static GlobalConfigPtr GetInstance(const std::string& strConfigFileName);
 
     /**
      *  Gets the global database Mutex object. Lock this before
@@ -104,20 +101,15 @@ public:
      *  Destructor, closes the config file. Generally calling Destroy
      *  explicitly is much safer.
      */
-    ~GlobalConfig();
+    virtual ~GlobalConfig();
 
-private:
+protected:
 
     /**
      *  Read and parse a configuration file.
      *  @param strConfigFileName Name of the configuration file to parse
      */
-    GlobalConfig(std::string& strConfigFileName);
-
-    /**
-     *  Default constructor, read and parse the default configuration
-     */
-    GlobalConfig();
+    GlobalConfig(const std::string& strConfigFileName);
 
     /**
      *  Trim leading and trailing whitespaces from strings in place.
@@ -130,7 +122,7 @@ private:
      *  @param strConfigName Name of the configuration value to fetch
      *  @return The configuration value content
      */
-    std::string GetDefaultValue(const std::string& strConfigName);
+    virtual std::string GetDefaultValue(const std::string& strConfigName);
 
     /// Hashmap containing all configuration string values read to far
     std::unordered_map<std::string, std::string> mmapStringVals;

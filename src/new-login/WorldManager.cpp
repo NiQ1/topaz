@@ -6,11 +6,11 @@
  */
 
 #include "WorldManager.h"
-#include "Debugging.h"
+#include "new-common/Debugging.h"
 #include <mariadb++/connection.hpp>
-#include "Database.h"
-#include "GlobalConfig.h"
-#include "Utilities.h"
+#include "new-common/Database.h"
+#include "LoginGlobalConfig.h"
+#include "new-common/Utilities.h"
 
 // Name of the login server queue
 #define LOGIN_MQ_NAME "LOGIN_MQ"
@@ -163,7 +163,7 @@ void WorldManager::LoadWorlds()
     LOCK_WORLDMGR;
 
     DBConnection DB = Database::GetDatabase();
-    GlobalConfigPtr Config = GlobalConfig::GetInstance();
+    GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
     LOCK_DB;
     LOCK_CONFIG;
 

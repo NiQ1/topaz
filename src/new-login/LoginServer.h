@@ -13,10 +13,10 @@
 
 #include <stdint.h>
 
-#include "TCPConnection.h"
+#include "new-common/TCPConnection.h"
 #include "ProtocolHandler.h"
 #include "ProtocolFactory.h"
-#include "Thread.h"
+#include "new-common/Thread.h"
 
 /**
  *	Main login server class.

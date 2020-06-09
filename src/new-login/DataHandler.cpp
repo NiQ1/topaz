@@ -7,11 +7,10 @@
 
 #include <mariadb++/connection.hpp>
 #include "DataHandler.h"
-#include "Debugging.h"
-#include "Database.h"
+#include "new-common/Debugging.h"
+#include "new-common/Database.h"
 #include "SessionTracker.h"
-#include "Utilities.h"
-#include "GlobalConfig.h"
+#include "new-common/Utilities.h"
 #include <time.h>
 #include <stdexcept>
 #include <memory>

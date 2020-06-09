@@ -6,7 +6,7 @@
  */
 
 #include "FFXIPacket.h"
-#include "Debugging.h"
+#include "new-common/Debugging.h"
 #include <openssl/md5.h>
 #include <stdexcept>
 

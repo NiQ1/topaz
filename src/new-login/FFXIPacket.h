@@ -8,7 +8,7 @@
 #ifndef FFXI_LOGIN_FFXI_PACKET_H
 #define FFXI_LOGIN_FFXI_PACKET_H
 
-#include "TCPConnection.h"
+#include "new-common/TCPConnection.h"
 #include <stdint.h>
 #include <memory>
 

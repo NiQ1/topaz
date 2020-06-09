@@ -7,10 +7,10 @@
 
 #include <mariadb++/connection.hpp>
 #include "Authentication.h"
-#include "Database.h"
-#include "GlobalConfig.h"
-#include "Utilities.h"
-#include "Debugging.h"
+#include "new-common/Database.h"
+#include "LoginGlobalConfig.h"
+#include "new-common/Utilities.h"
+#include "new-common/Debugging.h"
 #include "SessionTracker.h"
 #include <mutex>
 #include <time.h>
@@ -26,7 +26,7 @@ uint32_t Authentication::AuthenticateUser(const char* pszUsername, const char* p
     try {
         LOCK_DB;
         DBConnection DB = Database::GetDatabase();
-        GlobalConfigPtr Config = GlobalConfig::GetInstance();
+        GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
 
         std::string strSqlQueryFmt("SELECT id, privileges FROM %saccounts WHERE username='%s' AND password=SHA2(CONCAT('%s', salt), 256)");
         std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
@@ -51,7 +51,7 @@ uint32_t Authentication::AuthenticateUser(const char* pszUsername, const char* p
         // to connect to the data server.
         std::shared_ptr<LoginSession> NewSession = SessionTracker::GetInstance()->InitializeNewSession(dwAccountId,
             mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr,
-            GlobalConfig::GetInstance()->GetConfigUInt("session_timeout"));
+            LoginGlobalConfig::GetInstance()->GetConfigUInt("session_timeout"));
         NewSession->SetPrivilegesBitmask(dwPrivileges);
         return dwAccountId;
     }
@@ -68,7 +68,7 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
     try {
         LOCK_DB;
         DBConnection DB = Database::GetDatabase();
-        GlobalConfigPtr Config = GlobalConfig::GetInstance();
+        GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
 
         // First make sure username is unique
         std::string strSqlQueryFmt("SELECT id FROM %saccounts WHERE username='%s';");
@@ -140,7 +140,7 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         // to connect to the data server.
         std::shared_ptr<LoginSession> NewSession = SessionTracker::GetInstance()->InitializeNewSession(dwAccountId,
             mpConnection->GetConnectionDetails().BindDetails.sin_addr.s_addr,
-            GlobalConfig::GetInstance()->GetConfigUInt("session_timeout"));
+            LoginGlobalConfig::GetInstance()->GetConfigUInt("session_timeout"));
         // Assume newly created accounts are normal users so we can save a DB query
         NewSession->SetPrivilegesBitmask(ACCT_PRIV_ENABLED);
         return dwAccountId;
@@ -158,7 +158,7 @@ bool Authentication::ChangePassword(const char* pszUsername, const char* pszOldP
     try {
         LOCK_DB;
         DBConnection DB = Database::GetDatabase();
-        GlobalConfigPtr Config = GlobalConfig::GetInstance();
+        GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
 
         uint32_t dwUserUID = AuthenticateUser(pszUsername, pszOldPassword);
         if ((dwUserUID == 0) && (mLastError != AUTH_ACCOUNT_DISABLED)) {
