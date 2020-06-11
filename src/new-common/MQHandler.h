@@ -5,8 +5,8 @@
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#ifndef FFXI_LOGIN_MQHANDLER_H
-#define FFXI_LOGIN_MQHANDLER_H
+#ifndef FFXI_COMMON_MQHANDLER_H
+#define FFXI_COMMON_MQHANDLER_H
 
 #include <amqp.h>
 

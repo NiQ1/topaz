@@ -244,7 +244,7 @@ void ViewHandler::SendCharacterList()
     // Load character list from DB into session
     mpSession->LoadCharacterList();
     uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
-    const CharMessageHnd::CHARACTER_ENTRY* pCurrentChar;
+    const CHARACTER_ENTRY* pCurrentChar;
     WorldManagerPtr WorldMgr = WorldManager::GetInstance();
 
     CharListPacket.dwContentIds = mpSession->GetNumCharsAllowed();
@@ -321,7 +321,7 @@ void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
 
     LOCK_SESSION;
     // Notify the world server that a character wants to log in
-    CharMessageHnd::MESSAGE_LOGIN_REQUEST LoginMessage;
+    MESSAGE_LOGIN_REQUEST LoginMessage;
     LoginMessage.Header.eType = MQConnection::MQ_MESSAGE_CHAR_LOGIN;
     LoginMessage.Header.dwContentID = pRequestPacket->dwContentID;
     LoginMessage.Header.dwCharacterID = pRequestPacket->dwCharacterID;
@@ -336,7 +336,7 @@ void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
     // same name and that somehow share the same 2 lower level bytes of their character ID
     // (extremely unlikely).
     uint8_t cNumChars = mpSession->GetNumCharacters();
-    const CharMessageHnd::CHARACTER_ENTRY* pCurrentChar = NULL;
+    const CHARACTER_ENTRY* pCurrentChar = NULL;
     for (uint8_t i = 0; i < cNumChars; i++) {
         pCurrentChar = mpSession->GetCharacter(i);
         if (pCurrentChar == NULL) {
@@ -365,7 +365,7 @@ void ViewHandler::HandleLoginRequest(const LOGIN_REQUEST_PACKET* pRequestPacket)
 void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID)
 {
     LOG_DEBUG0("Called.");
-    CharMessageHnd::MESSAGE_LOGIN_RESPONSE* pResponseMessage = reinterpret_cast<CharMessageHnd::MESSAGE_LOGIN_RESPONSE*>(pMQMessage.get());
+    MESSAGE_LOGIN_RESPONSE* pResponseMessage = reinterpret_cast<MESSAGE_LOGIN_RESPONSE*>(pMQMessage.get());
     // Do some sanity on the message we got
     if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_LOGIN_ACK) ||
         (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
@@ -375,7 +375,7 @@ void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint
         mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Login response detail mismatch.");
     }
-    CharMessageHnd::CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
     if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
         LOG_ERROR("Character ID does not match content ID.");
         mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
@@ -409,7 +409,7 @@ void ViewHandler::PrepareNewCharacter(const CREATE_REQUEST_PACKET* pRequestPacke
 {
     LOG_DEBUG0("Called.");
     // This will throw if the client attempts to use a content ID not associated with its account
-    CharMessageHnd::CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
+    CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
     // Do some sanity checks on the content
     if (!pNewChar->bEnabled) {
         LOG_ERROR("Cannot create a new character using a disabled content ID.");
@@ -473,7 +473,7 @@ void ViewHandler::PrepareNewCharacter(const CREATE_REQUEST_PACKET* pRequestPacke
     // Send a request to the world server to reserve the character ID / name.
     // We will proceed once the world server confirms (this happens asynchronically)
     LOCK_WORLDMGR;
-    CharMessageHnd::MESSAGE_CREATE_REQUEST CreateChar;
+    MESSAGE_CREATE_REQUEST CreateChar;
     CreateChar.Header.dwAccountID = mpSession->GetAccountID();
     CreateChar.Header.dwCharacterID = dwNewCharID;
     CreateChar.Header.eType = MQConnection::MQ_MESSAGE_CHAR_RESERVE;
@@ -486,7 +486,7 @@ void ViewHandler::PrepareNewCharacter(const CREATE_REQUEST_PACKET* pRequestPacke
 void ViewHandler::CompletePrepareNewChar(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID)
 {
     LOG_DEBUG0("Called.");
-    CharMessageHnd::MESSAGE_GENERIC_RESPONSE* pResponseMessage = reinterpret_cast<CharMessageHnd::MESSAGE_GENERIC_RESPONSE*>(pMQMessage.get());
+    MESSAGE_GENERIC_RESPONSE* pResponseMessage = reinterpret_cast<MESSAGE_GENERIC_RESPONSE*>(pMQMessage.get());
     // Do some sanity on the message we got
     if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_RESERVE_ACK) ||
         (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
@@ -497,7 +497,7 @@ void ViewHandler::CompletePrepareNewChar(std::shared_ptr<uint8_t> pMQMessage, ui
         mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Prepare response detail mismatch.");
     }
-    CharMessageHnd::CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
     if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
         LOG_ERROR("Character ID does not match content ID.");
         CleanHalfCreatedCharacters();
@@ -518,7 +518,7 @@ void ViewHandler::ConfirmNewCharacter(const CONFIRM_CREATE_REQUEST_PACKET* pRequ
 {
     LOG_DEBUG0("Called.");
 
-    CharMessageHnd::CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
+    CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
     if ((!pNewChar->bEnabled) || (pNewChar->cNation != 0)) {
         LOG_ERROR("Character slot invalid or already taken.");
         CleanHalfCreatedCharacters();
@@ -553,7 +553,7 @@ void ViewHandler::ConfirmNewCharacter(const CONFIRM_CREATE_REQUEST_PACKET* pRequ
     pNewChar->cNation = pRequestPacket->Details.cNation;
     // 0 == no zone (character just been created)
     pNewChar->wZone = 0;
-    CharMessageHnd::MESSAGE_CONFIRM_CREATE_REQUEST ConfirmRequest;
+    MESSAGE_CONFIRM_CREATE_REQUEST ConfirmRequest;
     ConfirmRequest.Header.eType = MQConnection::MQ_MESSAGE_CHAR_CREATE;
     ConfirmRequest.Header.dwAccountID = mpSession->GetAccountID();
     ConfirmRequest.Header.dwContentID = pNewChar->dwContentID;
@@ -567,7 +567,7 @@ void ViewHandler::ConfirmNewCharacter(const CONFIRM_CREATE_REQUEST_PACKET* pRequ
 void ViewHandler::CompleteConfirmNewCharacter(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID)
 {
     LOG_DEBUG0("Called.");
-    CharMessageHnd::MESSAGE_CONFIRM_CREATE_RESPONSE* pResponseMessage = reinterpret_cast<CharMessageHnd::MESSAGE_CONFIRM_CREATE_RESPONSE*>(pMQMessage.get());
+    MESSAGE_CONFIRM_CREATE_RESPONSE* pResponseMessage = reinterpret_cast<MESSAGE_CONFIRM_CREATE_RESPONSE*>(pMQMessage.get());
     // Do some sanity on the message we got
     if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_CREATE_ACK) ||
         (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
@@ -578,7 +578,7 @@ void ViewHandler::CompleteConfirmNewCharacter(std::shared_ptr<uint8_t> pMQMessag
         mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Confirm response detail mismatch.");
     }
-    CharMessageHnd::CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
     if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
         LOG_ERROR("Character ID does not match content ID.");
         CleanHalfCreatedCharacters();
@@ -592,7 +592,7 @@ void ViewHandler::CompleteConfirmNewCharacter(std::shared_ptr<uint8_t> pMQMessag
         throw std::runtime_error("Confirm request rejected.");
     }
     // Commit the new character details to DB
-    CharMessageHnd::CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
     CharMessageHnd::UpdateCharacter(pNewChar);
     // Note: Successful completion of the creation process does not auto-login the user,
     // the client will request an updated character list and will then issue a login command.
@@ -603,7 +603,7 @@ void ViewHandler::CompleteConfirmNewCharacter(std::shared_ptr<uint8_t> pMQMessag
 void ViewHandler::DeleteCharacter(const DELETE_REQUEST_PACKET* pRequestPacket)
 {
     LOG_DEBUG0("Called.");
-    CharMessageHnd::CHARACTER_ENTRY* pDelChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
+    CHARACTER_ENTRY* pDelChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
     if (pDelChar->dwCharacterID != pRequestPacket->dwCharacterID) {
         LOG_ERROR("Character ID / Content ID mismatch.");
         mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
@@ -612,7 +612,7 @@ void ViewHandler::DeleteCharacter(const DELETE_REQUEST_PACKET* pRequestPacket)
     // Basically just pass the request to the world server. We'll only do the deletion
     // once the world server confirms.
     // Note: Using CHAR_MQ_MESSAGE_HEADER because it has no arguments other than the header
-    CharMessageHnd::CHAR_MQ_MESSAGE_HEADER DeleteRequest;
+    CHAR_MQ_MESSAGE_HEADER DeleteRequest;
     DeleteRequest.eType = MQConnection::MQ_MESSAGE_CHAR_DELETE;
     DeleteRequest.dwAccountID = mpSession->GetAccountID();
     DeleteRequest.dwContentID = pRequestPacket->dwContentID;
@@ -625,7 +625,7 @@ void ViewHandler::DeleteCharacter(const DELETE_REQUEST_PACKET* pRequestPacket)
 void ViewHandler::CompleteDeleteCharacter(std::shared_ptr<uint8_t> pMQMessage, uint8_t cWorldID)
 {
     LOG_DEBUG0("Called.");
-    CharMessageHnd::MESSAGE_GENERIC_RESPONSE* pResponseMessage = reinterpret_cast<CharMessageHnd::MESSAGE_GENERIC_RESPONSE*>(pMQMessage.get());
+    MESSAGE_GENERIC_RESPONSE* pResponseMessage = reinterpret_cast<MESSAGE_GENERIC_RESPONSE*>(pMQMessage.get());
     // Do some sanity on the message we got
     if ((pResponseMessage->Header.eType != MQConnection::MQ_MESSAGE_CHAR_DELETE_ACK) ||
         (pResponseMessage->Header.dwAccountID != mpSession->GetAccountID()) ||
@@ -635,7 +635,7 @@ void ViewHandler::CompleteDeleteCharacter(std::shared_ptr<uint8_t> pMQMessage, u
         mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Delete response detail mismatch.");
     }
-    CharMessageHnd::CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
     if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
         LOG_ERROR("Character ID does not match content ID.");
         mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);

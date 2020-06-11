@@ -192,14 +192,14 @@ public:
      *  @param cOffset Offset in the character list
      *  @return Character entry struct with character data
      */
-    CharMessageHnd::CHARACTER_ENTRY* GetCharacter(uint8_t cOffset);
+    CHARACTER_ENTRY* GetCharacter(uint8_t cOffset);
 
     /**
      *  Get a character entry struct given a content ID
      *  @param dwContentID Content ID of the needed character
      *  @return Character entry struct with character data
      */
-    CharMessageHnd::CHARACTER_ENTRY* GetCharacterByContentID(uint32_t dwContentID);
+    CHARACTER_ENTRY* GetCharacterByContentID(uint32_t dwContentID);
 
     /**
      *  Internal requests sent to the data server
@@ -308,7 +308,7 @@ private:
     // Client version
     std::string mstrClientVersion;
     // Character data list
-    CharMessageHnd::CHARACTER_ENTRY mCharacters[16];
+    CHARACTER_ENTRY mCharacters[16];
     // Whether character list has been loaded
     bool mbCharListLoaded;
     // Mutex for access sync

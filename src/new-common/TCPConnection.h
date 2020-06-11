@@ -5,8 +5,8 @@
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#ifndef FFXI_LOGIN_TCPCONNECTION_H
-#define FFXI_LOGIN_TCPCONNECTION_H
+#ifndef FFXI_COMMON_TCPCONNECTION_H
+#define FFXI_COMMON_TCPCONNECTION_H
 
 #include <string>
 #include <stdint.h>

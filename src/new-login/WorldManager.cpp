@@ -11,9 +11,7 @@
 #include "new-common/Database.h"
 #include "LoginGlobalConfig.h"
 #include "new-common/Utilities.h"
-
-// Name of the login server queue
-#define LOGIN_MQ_NAME "LOGIN_MQ"
+#include "new-common/CommonMessages.h"
 
 WorldManagerPtr WorldManager::smpSingletonObj = NULL;
 bool WorldManager::sbBeingDestroyed = false;

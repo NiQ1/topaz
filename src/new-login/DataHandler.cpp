@@ -179,7 +179,7 @@ void DataHandler::SendCharacterList()
     mpSession->LoadCharacterList();
     uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
     uint8_t cNumChars = min(mpSession->GetNumCharacters(), cNumCharsAllowed);
-    const CharMessageHnd::CHARACTER_ENTRY* pCurrentChar;
+    const CHARACTER_ENTRY* pCurrentChar;
 
     for (uint8_t i = 0; i < cNumChars; i++) {
         pCurrentChar = mpSession->GetCharacter(i);

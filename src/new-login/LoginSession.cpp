@@ -98,7 +98,7 @@ uint8_t LoginSession::GetNumCharsAllowed() const
     return mcNumCharsAllowed;
 }
 
-CharMessageHnd::CHARACTER_ENTRY* LoginSession::GetCharacter(uint8_t cOffset)
+CHARACTER_ENTRY* LoginSession::GetCharacter(uint8_t cOffset)
 {
     if (!mbCharListLoaded) {
         LOG_ERROR("Attempted to access character data before loading from DB.");
@@ -351,7 +351,7 @@ bool LoginSession::IsContentIDAssociatedWithSession(uint32_t dwContentID)
     return false;
 }
 
-CharMessageHnd::CHARACTER_ENTRY* LoginSession::GetCharacterByContentID(uint32_t dwContentID)
+CHARACTER_ENTRY* LoginSession::GetCharacterByContentID(uint32_t dwContentID)
 {
     if (!mbCharListLoaded) {
         LOG_ERROR("Attempted to access character data before loading from DB.");

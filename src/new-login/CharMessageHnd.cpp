@@ -139,7 +139,7 @@ void CharMessageHnd::UpdateCharacter(CHARACTER_ENTRY* pNewDetails)
     }
 }
 
-CharMessageHnd::CHARACTER_ENTRY CharMessageHnd::QueryCharacter(uint32_t dwCharacterID, uint8_t cWorldID)
+CHARACTER_ENTRY CharMessageHnd::QueryCharacter(uint32_t dwCharacterID, uint8_t cWorldID)
 {
     LOG_DEBUG0("Called.");
     DBConnection DB = Database::GetDatabase();
@@ -181,7 +181,7 @@ CharMessageHnd::CHARACTER_ENTRY CharMessageHnd::QueryCharacter(uint32_t dwCharac
     return CharEnt;
 }
 
-CharMessageHnd::CHARACTER_ENTRY CharMessageHnd::QueryCharacter(uint32_t dwContentID)
+CHARACTER_ENTRY CharMessageHnd::QueryCharacter(uint32_t dwContentID)
 {
     LOG_DEBUG0("Called.");
     DBConnection DB = Database::GetDatabase();
