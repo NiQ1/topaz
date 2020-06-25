@@ -89,6 +89,12 @@ std::string WorldGlobalConfig::GetDefaultValue(const std::string& strConfigName)
     else if (strConfigName == "mq_vhost") {
         return "topaz";
     }
+    else if (strConfigName == "reservation_timeout") {
+        // Max period allowed between the time when the user finished customizing
+        // the character appearance and job and the time the user selects a nation
+        // and confirms the character.
+        return "300";
+    }
     LOG_ERROR("No default configuration value found.");
     throw std::runtime_error("Configuration value does not have a hardcoded default");
 }

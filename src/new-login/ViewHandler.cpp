@@ -434,6 +434,7 @@ void ViewHandler::PrepareNewCharacter(const CREATE_REQUEST_PACKET* pRequestPacke
     GlobalConfigPtr Config = LoginGlobalConfig::GetInstance();
     // We will need a unique character ID (for the given world), so just pick the existing
     // max charid + 1
+    // Note: This is a SUGGESTED character ID and may be overwritten by the world server.
     uint32_t dwNewCharID = 0;
     std::string strSqlQueryFmt("SELECT MAX(character_id) FROM %schars WHERE world_id=%d;");
     std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
@@ -593,6 +594,8 @@ void ViewHandler::CompleteConfirmNewCharacter(std::shared_ptr<uint8_t> pMQMessag
     }
     // Commit the new character details to DB
     CHARACTER_ENTRY* pNewChar = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
+    // World server may have overwritten the character ID
+    pNewChar->dwCharacterID = pResponseMessage->Header.dwCharacterID;
     CharMessageHnd::UpdateCharacter(pNewChar);
     // Note: Successful completion of the creation process does not auto-login the user,
     // the client will request an updated character list and will then issue a login command.
