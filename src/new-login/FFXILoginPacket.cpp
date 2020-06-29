@@ -1,11 +1,11 @@
 /**
- *	@file FFXIPacket.cpp
+ *	@file FFXILoginPacket.cpp
  *	Implements the FFXI login packet header (for view server)
  *	@author Twilight
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#include "FFXIPacket.h"
+#include "FFXILoginPacket.h"
 #include "new-common/Debugging.h"
 #include <openssl/md5.h>
 #include <stdexcept>
@@ -13,7 +13,7 @@
 // Do not allocate more than this size per packet
 #define MAX_PACKET_SIZE_ALLOWED 1048576
 
-FFXIPacket::FFXIPacket(std::shared_ptr<TCPConnection> Connection) : mpConnection(Connection)
+FFXILoginPacket::FFXILoginPacket(std::shared_ptr<TCPConnection> Connection) : mpConnection(Connection)
 {
     LOG_DEBUG0("Called.");
     mbufPacketMagic[0] = 'I';
@@ -22,14 +22,14 @@ FFXIPacket::FFXIPacket(std::shared_ptr<TCPConnection> Connection) : mpConnection
     mbufPacketMagic[3] = 'F';
 }
 
-FFXIPacket::~FFXIPacket()
+FFXILoginPacket::~FFXILoginPacket()
 {
     // Currently empty, intentionally not closing the connection because
     // ProtocolHandler does it for us.
     LOG_DEBUG0("Called.");
 }
 
-std::shared_ptr<uint8_t> FFXIPacket::ReceivePacket()
+std::shared_ptr<uint8_t> FFXILoginPacket::ReceivePacket()
 {
     LOG_DEBUG0("Called.");
     // Get header first because it contains the length of the packet
@@ -72,7 +72,7 @@ std::shared_ptr<uint8_t> FFXIPacket::ReceivePacket()
     return std::shared_ptr<uint8_t>(PacketData);
 }
 
-void FFXIPacket::SendPacket(uint8_t* pPacket)
+void FFXILoginPacket::SendPacket(uint8_t* pPacket)
 {
     LOG_DEBUG0("Called.");
     if (memcmp(reinterpret_cast<FFXI_PACKET_HEADER*>(pPacket)->bufMagic, mbufPacketMagic, sizeof(mbufPacketMagic)) != 0) {
@@ -86,7 +86,7 @@ void FFXIPacket::SendPacket(uint8_t* pPacket)
     }
 }
 
-void FFXIPacket::SendPacket(FFXI_PACKET_TYPES eType, uint8_t* pData, uint32_t cbData)
+void FFXILoginPacket::SendPacket(FFXI_PACKET_TYPES eType, uint8_t* pData, uint32_t cbData)
 {
     LOG_DEBUG0("Called.");
     if (cbData + sizeof(FFXI_PACKET_HEADER) > MAX_PACKET_SIZE_ALLOWED) {
@@ -113,7 +113,7 @@ void FFXIPacket::SendPacket(FFXI_PACKET_TYPES eType, uint8_t* pData, uint32_t cb
     delete pPacket;
 }
 
-void FFXIPacket::SendError(FFXI_ERROR_CODES ErrorCode)
+void FFXILoginPacket::SendError(FFXI_ERROR_CODES ErrorCode)
 {
     LOG_WARNING("Sending error %d to the client.", ErrorCode);
     FFXI_ERROR_PACKET ErrorPacket;
@@ -122,7 +122,7 @@ void FFXIPacket::SendError(FFXI_ERROR_CODES ErrorCode)
     SendPacket(FFXI_TYPE_ERROR, reinterpret_cast<uint8_t*>(&ErrorPacket), sizeof(ErrorPacket));
 }
 
-void FFXIPacket::SendDone()
+void FFXILoginPacket::SendDone()
 {
     LOG_DEBUG1("Sending done packet.");
     // Body is 4 bytes, meaning is unknown

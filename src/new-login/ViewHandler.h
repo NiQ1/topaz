@@ -9,7 +9,7 @@
 #define FFXI_LOGIN_VIEWHANDLER_H
 
 #include "ProtocolHandler.h"
-#include "FFXIPacket.h"
+#include "FFXILoginPacket.h"
 #include "LoginSession.h"
 #include <memory>
 
@@ -250,7 +250,7 @@ private:
     void CleanHalfCreatedCharacters();
 
     /// FFXI Packet parser
-    FFXIPacket mParser;
+    FFXILoginPacket mParser;
     /// Associated session
     std::shared_ptr<LoginSession> mpSession;
     /// Last login request packet received

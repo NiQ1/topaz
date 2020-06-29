@@ -1,5 +1,5 @@
 /**
- *	@file FFXIPacket.h
+ *	@file FFXILoginPacket.h
  *	Implements the FFXI login packet header (for view server)
  *	@author Twilight
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
@@ -18,20 +18,20 @@
  *  game client (rather than the bootloader) so it needs to speak the
  *  FFXI protocol.
  */
-class FFXIPacket {
+class FFXILoginPacket {
 public:
 
     /**
      *  Initialize a new object.
      *  @param Connection underlying TCP connection (login server uses TCP)
      */
-    FFXIPacket(std::shared_ptr<TCPConnection> Connection);
+    FFXILoginPacket(std::shared_ptr<TCPConnection> Connection);
 
     /**
      *  Destructor.
      *  Does not close the TCP connection.
      */
-    ~FFXIPacket();
+    ~FFXILoginPacket();
 
 #pragma pack(push, 1)
     /**

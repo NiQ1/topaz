@@ -63,7 +63,7 @@ void ViewHandler::Run()
 
     // Packet pointers
     std::shared_ptr<uint8_t> pRawData;
-    FFXIPacket::FFXI_PACKET_HEADER* pPacketHeader = NULL;
+    FFXILoginPacket::FFXI_PACKET_HEADER* pPacketHeader = NULL;
     uint8_t* pPayloadData = NULL;
     LoginSession::REQUESTS_TO_VIEW_SERVER RequestFromData = LoginSession::VIEW_SERVER_IDLE;
     std::shared_ptr<uint8_t> pMessageFromMQ;
@@ -81,14 +81,14 @@ void ViewHandler::Run()
                     break;
                 }
                 // Nasty but needed trick to get the raw pointer
-                pPacketHeader = reinterpret_cast<FFXIPacket::FFXI_PACKET_HEADER*>(pRawData.get());
-                pPayloadData = pRawData.get() + sizeof(FFXIPacket::FFXI_PACKET_HEADER);
+                pPacketHeader = reinterpret_cast<FFXILoginPacket::FFXI_PACKET_HEADER*>(pRawData.get());
+                pPayloadData = pRawData.get() + sizeof(FFXILoginPacket::FFXI_PACKET_HEADER);
 
                 switch (pPacketHeader->dwPacketType) {
-                case FFXIPacket::FFXI_TYPE_GET_FEATURES:
+                case FFXILoginPacket::FFXI_TYPE_GET_FEATURES:
                     CheckVersionAndSendFeatures(pPayloadData);
                     break;
-                case FFXIPacket::FFXI_TYPE_GET_CHARACTER_LIST:
+                case FFXILoginPacket::FFXI_TYPE_GET_CHARACTER_LIST:
                     // Make sure the data server has already installed the character list,
                     // otherwise wait for it.
                     mbReceivedSendCharListClient = true;
@@ -96,19 +96,19 @@ void ViewHandler::Run()
                         SendCharacterList();
                     }
                     break;
-                case FFXIPacket::FFXI_TYPE_GET_WORLD_LIST:
+                case FFXILoginPacket::FFXI_TYPE_GET_WORLD_LIST:
                     SendWorldList();
                     break;
-                case FFXIPacket::FFXI_TYPE_LOGIN_REQUEST:
+                case FFXILoginPacket::FFXI_TYPE_LOGIN_REQUEST:
                     HandleLoginRequest(reinterpret_cast<LOGIN_REQUEST_PACKET*>(pPayloadData));
                     break;
-                case FFXIPacket::FFXI_TYPE_CREATE_CHARACTER:
+                case FFXILoginPacket::FFXI_TYPE_CREATE_CHARACTER:
                     PrepareNewCharacter(reinterpret_cast<CREATE_REQUEST_PACKET*>(pPayloadData));
                     break;
-                case FFXIPacket::FFXI_TYPE_CREATE_CHAR_CONFIRM:
+                case FFXILoginPacket::FFXI_TYPE_CREATE_CHAR_CONFIRM:
                     ConfirmNewCharacter(reinterpret_cast<CONFIRM_CREATE_REQUEST_PACKET*>(pPayloadData));
                     break;
-                case FFXIPacket::FFXI_TYPE_DELETE_CHARACTER:
+                case FFXILoginPacket::FFXI_TYPE_DELETE_CHARACTER:
                     DeleteCharacter(reinterpret_cast<DELETE_REQUEST_PACKET*>(pPayloadData));
                     break;
                 default:
@@ -155,7 +155,7 @@ void ViewHandler::Run()
                     CompleteDeleteCharacter(pMessageFromMQ, cOrigin);
                 default:
                     LOG_ERROR("Invalid message received from world server.");
-                    mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+                    mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
                     throw std::runtime_error("MQ message type unknown.");
                 }
             }
@@ -163,7 +163,7 @@ void ViewHandler::Run()
             // Maybe we've timed out
             if ((mtmOperationTimeout != 0) && (time(NULL) >= mtmOperationTimeout)) {
                 LOG_ERROR("Timed out waiting for a reply from the world server.");
-                mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+                mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
                 throw std::runtime_error("World server response timeout.");
             }
         }
@@ -191,7 +191,7 @@ void ViewHandler::CheckVersionAndSendFeatures(const uint8_t* pRequestPacket)
     std::string strExpectedVersion(Config->GetConfigString("expected_client_version"));
     if ((dwVersionLock == 1) && (strClientVersion != strExpectedVersion)) {
         LOG_WARNING("Received connection from a client with a wrong version.");
-        mParser.SendError(FFXIPacket::FFXI_ERROR_VERSION_MISMATCH);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_VERSION_MISMATCH);
         throw std::runtime_error("Client version mismatch.");
     }
     if (dwVersionLock == 2) {
@@ -200,7 +200,7 @@ void ViewHandler::CheckVersionAndSendFeatures(const uint8_t* pRequestPacket)
         uint32_t dwExpectedVer = std::stoul(strExpectedVersion.substr(0, 6));
         if (dwClientVer < dwExpectedVer) {
             LOG_WARNING("Received connection from a client with a version too old.");
-            mParser.SendError(FFXIPacket::FFXI_ERROR_VERSION_MISMATCH);
+            mParser.SendError(FFXILoginPacket::FFXI_ERROR_VERSION_MISMATCH);
             throw std::runtime_error("Client too old.");
         }
     }
@@ -230,7 +230,7 @@ void ViewHandler::CheckVersionAndSendFeatures(const uint8_t* pRequestPacket)
     // Also save the data to session because we'll need to send it to MQ later on
     mpSession->SetExpansionsBitmask(ExpFeatures.dwExpansions);
     mpSession->SetFeaturesBitmask(ExpFeatures.dwFeatures);
-    mParser.SendPacket(FFXIPacket::FFXI_TYPE_FEATURES_LIST, reinterpret_cast<uint8_t*>(&ExpFeatures), sizeof(ExpFeatures));
+    mParser.SendPacket(FFXILoginPacket::FFXI_TYPE_FEATURES_LIST, reinterpret_cast<uint8_t*>(&ExpFeatures), sizeof(ExpFeatures));
 }
 
 void ViewHandler::SendCharacterList()
@@ -281,7 +281,7 @@ void ViewHandler::SendCharacterList()
         CharListPacket.CharList[i].Details.wZone2 = pCurrentChar->wZone;
     }
     LOG_DEBUG1("Sending character list.");
-    mParser.SendPacket(FFXIPacket::FFXI_TYPE_CHARACTER_LIST, reinterpret_cast<uint8_t*>(&CharListPacket), sizeof(CharListPacket));
+    mParser.SendPacket(FFXILoginPacket::FFXI_TYPE_CHARACTER_LIST, reinterpret_cast<uint8_t*>(&CharListPacket), sizeof(CharListPacket));
     LOG_DEBUG1("Character list sent.");
 }
 
@@ -306,7 +306,7 @@ void ViewHandler::SendWorldList()
         dwWorldListPacketSize = WorldMgr->GetUserWorldsPacketSize();
     }
     LOG_DEBUG1("Sending world list.");
-    mParser.SendPacket(FFXIPacket::FFXI_TYPE_WORLD_LIST, pWorldListPacket.get(), dwWorldListPacketSize);
+    mParser.SendPacket(FFXILoginPacket::FFXI_TYPE_WORLD_LIST, pWorldListPacket.get(), dwWorldListPacketSize);
     LOG_DEBUG1("World list sent.");
 }
 
@@ -372,18 +372,18 @@ void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint
         (mpSession->IsContentIDAssociatedWithSession(pResponseMessage->Header.dwContentID) == 0)) {
         // From the client's point of view this is a communication error with the map server
         LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Login response detail mismatch.");
     }
     CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
     if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
         LOG_ERROR("Character ID does not match content ID.");
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Char id / content id mismatch.");
     }
     if (pResponseMessage->dwResponseCode != 0) {
         LOG_ERROR("Server rejected login request.");
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Login request rejected.");
     }
     // Send the map server details to client
@@ -399,7 +399,7 @@ void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint
     ConfirmPacket.wSearchPort = pResponseMessage->wSearchPort;
     ConfirmPacket.wZero2 = 0;
     LOG_INFO("Character %s (%d) successfully logged-in.", ConfirmPacket.szCharacterName, ConfirmPacket.dwCharacterID);
-    mParser.SendPacket(FFXIPacket::FFXI_TYPE_LOGIN_RESPONSE, reinterpret_cast<uint8_t*>(&ConfirmPacket), sizeof(ConfirmPacket));
+    mParser.SendPacket(FFXILoginPacket::FFXI_TYPE_LOGIN_RESPONSE, reinterpret_cast<uint8_t*>(&ConfirmPacket), sizeof(ConfirmPacket));
     // At this point the client should switch to the zone server, our job's
     // done so drop the connection.
     mbShutdown = true;
@@ -495,20 +495,20 @@ void ViewHandler::CompletePrepareNewChar(std::shared_ptr<uint8_t> pMQMessage, ui
         // From the client's point of view this is a communication error with the map server
         LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
         CleanHalfCreatedCharacters();
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Prepare response detail mismatch.");
     }
     CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
     if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
         LOG_ERROR("Character ID does not match content ID.");
         CleanHalfCreatedCharacters();
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Char id / content id mismatch.");
     }
     if (pResponseMessage->dwResponseCode != 0) {
         LOG_ERROR("Server rejected reserve request.");
         CleanHalfCreatedCharacters();
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Reserve request rejected.");
     }
     mParser.SendDone();
@@ -523,7 +523,7 @@ void ViewHandler::ConfirmNewCharacter(const CONFIRM_CREATE_REQUEST_PACKET* pRequ
     if ((!pNewChar->bEnabled) || (pNewChar->cNation != 0)) {
         LOG_ERROR("Character slot invalid or already taken.");
         CleanHalfCreatedCharacters();
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Invalid character slot.");
     }
     // Fill in all character data. The gear data is purely used for login screen visuals so we
@@ -576,20 +576,20 @@ void ViewHandler::CompleteConfirmNewCharacter(std::shared_ptr<uint8_t> pMQMessag
         // From the client's point of view this is a communication error with the map server
         LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
         CleanHalfCreatedCharacters();
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Confirm response detail mismatch.");
     }
     CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
     if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
         LOG_ERROR("Character ID does not match content ID.");
         CleanHalfCreatedCharacters();
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Char id / content id mismatch.");
     }
     if (pResponseMessage->dwResponseCode != 0) {
         LOG_ERROR("Server rejected confirm request.");
         CleanHalfCreatedCharacters();
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Confirm request rejected.");
     }
     // Commit the new character details to DB
@@ -609,7 +609,7 @@ void ViewHandler::DeleteCharacter(const DELETE_REQUEST_PACKET* pRequestPacket)
     CHARACTER_ENTRY* pDelChar = mpSession->GetCharacterByContentID(pRequestPacket->dwContentID);
     if (pDelChar->dwCharacterID != pRequestPacket->dwCharacterID) {
         LOG_ERROR("Character ID / Content ID mismatch.");
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Character ID / Content ID mismatch.");
     }
     // Basically just pass the request to the world server. We'll only do the deletion
@@ -635,18 +635,18 @@ void ViewHandler::CompleteDeleteCharacter(std::shared_ptr<uint8_t> pMQMessage, u
         (mpSession->IsContentIDAssociatedWithSession(pResponseMessage->Header.dwContentID) == 0)) {
         // From the client's point of view this is a communication error with the map server
         LOG_ERROR("Received an invalid response from the map server (Header details don't match request).");
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Delete response detail mismatch.");
     }
     CHARACTER_ENTRY* pCharEntry = mpSession->GetCharacterByContentID(pResponseMessage->Header.dwContentID);
     if ((pCharEntry->cWorldID != cWorldID) || (pCharEntry->dwCharacterID != pResponseMessage->Header.dwCharacterID)) {
         LOG_ERROR("Character ID does not match content ID.");
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Char id / content id mismatch.");
     }
     if (pResponseMessage->dwResponseCode != 0) {
         LOG_ERROR("Server rejected delete request.");
-        mParser.SendError(FFXIPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
+        mParser.SendError(FFXILoginPacket::FFXI_ERROR_MAP_CONNECT_FAILED);
         throw std::runtime_error("Delete request rejected.");
     }
     // Remove the character from DB and session
