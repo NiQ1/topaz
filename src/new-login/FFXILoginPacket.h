@@ -5,9 +5,10 @@
  *	@copyright 2020, all rights reserved. Licensed under AGPLv3
  */
 
-#ifndef FFXI_LOGIN_FFXI_PACKET_H
-#define FFXI_LOGIN_FFXI_PACKET_H
+#ifndef FFXI_LOGIN_FFXI_LOGIN_PACKET_H
+#define FFXI_LOGIN_FFXI_LOGIN_PACKET_H
 
+#include "new-common/FFXIPacket.h"
 #include "new-common/TCPConnection.h"
 #include <stdint.h>
 #include <memory>
@@ -18,7 +19,7 @@
  *  game client (rather than the bootloader) so it needs to speak the
  *  FFXI protocol.
  */
-class FFXILoginPacket {
+class FFXILoginPacket : public FFXIPacket {
 public:
 
     /**
@@ -31,20 +32,16 @@ public:
      *  Destructor.
      *  Does not close the TCP connection.
      */
-    ~FFXILoginPacket();
+    virtual ~FFXILoginPacket();
 
 #pragma pack(push, 1)
     /**
      *  FFXI Packet header and data
      */
-    struct FFXI_PACKET_HEADER
+    struct FFXI_LOGIN_PACKET_HEADER
     {
-        // Length of the packet (including the header)
-        uint32_t dwPacketSize;
-        // Magic ("XIFF")
-        uint8_t bufMagic[4];
-        // Packet type (see enum)
-        uint32_t dwPacketType;
+        // Standard packet header
+        FFXI_PACKET_HEADER PacketHeader;
         // Packet MD5 hash (on everything, including header)
         uint8_t bufMD5[16];
     };
@@ -102,35 +99,23 @@ public:
     };
 
     /**
-     *  Receive a packet from the network.
-     *  @return pointer to the received data, including header. The packet data follows the header.
-     */
-    std::shared_ptr<uint8_t> ReceivePacket();
-
-    /**
-     *  Send a raw packet
-     *  @param pPacket Packet to send, including the header. The packet data should follow the header
-     */
-    void SendPacket(uint8_t* pPacket);
-
-    /**
      *  Construct and sent a packet
      *  @param eType Packet type (see enum)
      *  @param pData Data to send (without header)
      *  @param cbData Size of the data (without header) in bytes
      */
-    void SendPacket(FFXI_PACKET_TYPES eType, uint8_t* pData, uint32_t cbData);
+    virtual void SendPacket(FFXI_PACKET_TYPES eType, uint8_t* pData, uint32_t cbData);
 
     /**
      *  Sends an error packet to the client
      *  @param ErrorCode Error code to send (from FFXI_ERROR_CODES enum)
      */
-    void SendError(FFXI_ERROR_CODES ErrorCode);
+    virtual void SendError(FFXI_ERROR_CODES ErrorCode);
 
     /**
      *  Send a success message
      */
-    void SendDone();
+    virtual void SendDone();
 
 #pragma pack(push, 1)
     /**
@@ -142,13 +127,6 @@ public:
         uint32_t dwErrorCode;
     };
 #pragma pack(pop)
-
-private:
-
-    /// Connected TCP socket
-    std::shared_ptr<TCPConnection> mpConnection;
-    /// Packet magic
-    uint8_t mbufPacketMagic[4];
 
 };
 

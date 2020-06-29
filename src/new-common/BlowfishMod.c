@@ -2,17 +2,6 @@
 #include <string.h>
 #include <openssl/md5.h>
 
-// Initial key used by the search server. Rotates with each packet.
-const uint8_t bf_key[24] =
-{
-    0x30, 0x73, 0x3D, 0x6D,
-    0x3C, 0x31, 0x49, 0x5A,
-    0x32, 0x7A, 0x42, 0x43,
-    0x63, 0x38, 0x7B, 0x7E,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00
-};
-
 // Standard initial Blowfish table. This is a hex representation of
 // the first digits of Pi.
 const BLOWFISH_MOD_KEY g_blowfish_mod_init =
@@ -301,18 +290,32 @@ void bfmod_init_table(BLOWFISH_MOD_KEY* keytable, char* keyin, uint32_t keyinlen
     }
 }
 
+void bfmod_encrypt_inplace(const BLOWFISH_MOD_KEY* keytable, char* buffer, uint32_t len)
+{
+	// For buffer to lower 64-bit divisable size for safety
+	len -= (len % 8);
+	for (uint32_t i = 0; i < len; i += 8) {
+		bfmod_encrypt_chunk((uint32_t*)(buffer + i), keytable);
+	}
+}
+
 void bfmod_encrypt(const BLOWFISH_MOD_KEY* keytable, const char* input, char* output, uint32_t len)
 {
     memcpy(output, input, len);
-    for (uint32_t i = 0; i < len; i += 8) {
-        bfmod_encrypt_chunk((uint32_t*)(output + i), keytable);
-    }
+	bfmod_encrypt_inplace(keytable, output, len);
+}
+
+void bfmod_decrypt_inplace(const BLOWFISH_MOD_KEY* keytable, char* buffer, uint32_t len)
+{
+	// For buffer to lower 64-bit divisable size for safety
+	len -= (len % 8);
+	for (uint32_t i = 0; i < len; i += 8) {
+		bfmod_decrypt_chunk((uint32_t*)(buffer + i), keytable);
+	}
 }
 
 void bfmod_decrypt(const BLOWFISH_MOD_KEY* keytable, const char* input, char* output, uint32_t len)
 {
     memcpy(output, input, len);
-    for (uint32_t i = 0; i < len; i += 8) {
-        bfmod_decrypt_chunk((uint32_t*)(output + i), keytable);
-    }
+	bfmod_decrypt_inplace(keytable, output, len);
 }

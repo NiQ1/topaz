@@ -76,7 +76,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..;C:\Users\hdan\Code\rabbitmq-c\librabbitmq;C:\Users\hdan\Code\mariadbpp\include;C:\Program Files\MariaDB 10.3\include\mysql</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;C:\Users\hdan\Code\rabbitmq-c\librabbitmq;C:\Users\hdan\Code\mariadbpp\include;C:\Program Files\MariaDB 10.3\include\mysql;C:\Users\hdan\Code\openssl-1.0.2s\include</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -85,7 +85,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..;C:\Users\hdan\Code\rabbitmq-c\librabbitmq;C:\Users\hdan\Code\mariadbpp\include;C:\Program Files\MariaDB 10.3\include\mysql</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;C:\Users\hdan\Code\rabbitmq-c\librabbitmq;C:\Users\hdan\Code\mariadbpp\include;C:\Program Files\MariaDB 10.3\include\mysql;C:\Users\hdan\Code\openssl-1.0.2s\include</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -96,7 +96,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..;C:\Users\hdan\Code\rabbitmq-c\librabbitmq;C:\Users\hdan\Code\mariadbpp\include;C:\Program Files\MariaDB 10.3\include\mysql</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;C:\Users\hdan\Code\rabbitmq-c\librabbitmq;C:\Users\hdan\Code\mariadbpp\include;C:\Program Files\MariaDB 10.3\include\mysql;C:\Users\hdan\Code\openssl-1.0.2s\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -111,7 +111,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..;C:\Users\hdan\Code\rabbitmq-c\librabbitmq;C:\Users\hdan\Code\mariadbpp\include;C:\Program Files\MariaDB 10.3\include\mysql</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;C:\Users\hdan\Code\rabbitmq-c\librabbitmq;C:\Users\hdan\Code\mariadbpp\include;C:\Program Files\MariaDB 10.3\include\mysql;C:\Users\hdan\Code\openssl-1.0.2s\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -120,10 +120,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CharCreateHnd.h" />
+    <ClInclude Include="FFXISearchPacket.h" />
     <ClInclude Include="WorldGlobalConfig.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CharCreateHnd.cpp" />
+    <ClCompile Include="FFXISearchPacket.cpp" />
     <ClCompile Include="WorldGlobalConfig.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

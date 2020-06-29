@@ -37,6 +37,14 @@ typedef struct _BLOWFISH_MOD_KEY
 void bfmod_init_table(BLOWFISH_MOD_KEY* keytable, char* keyin, uint32_t keyinlen);
 
 /**
+ *  Encrypts a buffer of data in place.
+ *  @param keytable Blowfish key table to use as key
+ *  @param buffer Buffer to encrypt
+ *  @param len Length of the buffer in bytes. Must be divisible by 64.
+ */
+void bfmod_encrypt_inplace(const BLOWFISH_MOD_KEY* keytable, char* buffer, uint32_t len);
+
+/**
  *  Encrypts a buffer of data.
  *  @param keytable Blowfish key table to use as key
  *  @param input Input buffer to encrypt, must be a product of 64 bytes.
@@ -44,6 +52,14 @@ void bfmod_init_table(BLOWFISH_MOD_KEY* keytable, char* keyin, uint32_t keyinlen
  *  @param len Length of the buffers in bytes. Must be divisible by 64.
  */
 void bfmod_encrypt(const BLOWFISH_MOD_KEY* keytable, const char* input, char* output, uint32_t len);
+
+/**
+ *  Decrypts a buffer of data in place.
+ *  @param keytable Blowfish key table to use as key
+ *  @param buffer Buffer to decrypt
+ *  @param len Length of the buffer in bytes. Must be divisible by 64.
+ */
+void bfmod_decrypt_inplace(const BLOWFISH_MOD_KEY* keytable, char* buffer, uint32_t len);
 
 /**
  *  Decrypts a buffer of data.
