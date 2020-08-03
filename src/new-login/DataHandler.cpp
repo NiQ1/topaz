@@ -177,8 +177,8 @@ void DataHandler::SendCharacterList()
     DATA_PACKET_CHARACTER_ENTRY CharList[16];
     // Load character list from DB into session
     mpSession->LoadCharacterList();
-    uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
-    uint8_t cNumChars = min(mpSession->GetNumCharacters(), cNumCharsAllowed);
+    uint8_t cNumCharsAllowed = ffxi_min(mpSession->GetNumCharsAllowed(), 16);
+    uint8_t cNumChars = ffxi_min(mpSession->GetNumCharacters(), cNumCharsAllowed);
     const CHARACTER_ENTRY* pCurrentChar;
 
     for (uint8_t i = 0; i < cNumChars; i++) {
