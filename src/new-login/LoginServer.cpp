@@ -13,6 +13,7 @@
 #include "SessionTracker.h"
 #include "WorldManager.h"
 
+#include <string.h>
 #include <stdexcept>
 #include <thread>
 #include <chrono>
