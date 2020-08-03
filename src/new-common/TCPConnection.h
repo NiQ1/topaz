@@ -15,6 +15,7 @@
 #ifdef _WIN32
 #include <WinSock2.h>
 #else
+#define _BSD_SOURCE
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
