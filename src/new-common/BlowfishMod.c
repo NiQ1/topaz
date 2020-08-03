@@ -200,7 +200,7 @@ const BLOWFISH_MOD_KEY g_blowfish_mod_init =
  *	Modded Blowfish step function. This function the only different function between
  *	the FFXI encryption and standard Blowfish.
  */
-inline uint32_t bfmod_step(uint32_t R, const uint32_t* S)
+static inline uint32_t bfmod_step(uint32_t R, const uint32_t* S)
 {
     return (
         (S[((int)(R) & 0xff)] ) + 
