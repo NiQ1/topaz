@@ -9,6 +9,7 @@
 #include "new-common/Debugging.h"
 #include "Authentication.h"
 #include "LoginGlobalConfig.h"
+#include <string.h>
 #include <thread>
 #include <chrono>
 

@@ -6,6 +6,7 @@
  */
 
 #include "CharMessageHnd.h"
+#include <string.h>
 #include <mariadb++/connection.hpp>
 #include "new-common/Database.h"
 #include "new-common/Debugging.h"

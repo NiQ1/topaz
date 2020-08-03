@@ -7,6 +7,7 @@
 
 #include "FFXILoginPacket.h"
 #include "new-common/Debugging.h"
+#include <string.h>
 #include <openssl/md5.h>
 #include <stdexcept>
 

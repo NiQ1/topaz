@@ -7,6 +7,7 @@
 
 #include "Utilities.h"
 #include "Debugging.h"
+#include <string.h>
 #include <stdexcept>
 
 std::string FormatStringV(const std::string* pstrFormat, va_list args)

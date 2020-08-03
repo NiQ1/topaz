@@ -7,6 +7,7 @@
 
 #include "GlobalConfig.h"
 #include "Debugging.h"
+#include <string.h>
 
 GlobalConfigPtr GlobalConfig::smpSingletonObj = NULL;
 bool GlobalConfig::sbBeingDestroyed = false;

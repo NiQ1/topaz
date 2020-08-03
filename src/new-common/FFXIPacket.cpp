@@ -8,6 +8,7 @@
 #include "FFXIPacket.h"
 #include "Debugging.h"
 #include <stdexcept>
+#include <string.h>
 
 // Do not allocate more than this size per packet
 #define MAX_PACKET_SIZE_ALLOWED 1048576

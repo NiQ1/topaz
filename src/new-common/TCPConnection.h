@@ -15,11 +15,12 @@
 #ifdef _WIN32
 #include <WinSock2.h>
 #else
+#include <unistd.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #define closesocket close
-#defome SOCKET int
+#define SOCKET int
 #endif
 
  /**

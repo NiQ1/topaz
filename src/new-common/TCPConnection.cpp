@@ -7,6 +7,7 @@
 
 #include "TCPConnection.h"
 #include "Debugging.h"
+#include <stdexcept>
 
 #ifdef _WIN32
 #define SHUT_RD   SD_RECEIVE
