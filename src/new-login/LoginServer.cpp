@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #ifdef _WIN32
 #include <WinSock2.h>
+#include <WS2tcpip.h>
 #else
 #include <sys/time.h>
 #include <sys/socket.h>
@@ -102,7 +103,7 @@ void LoginServer::Run()
 	// Timeout for select calls
 	struct timeval tv = { 0, 1000 };
 	// Size of saddrNewConnection
-	int cbsaddrNewConnection = 0;
+	socklen_t cbsaddrNewConnection = 0;
 	// New bound socket for incoming connections
 	BoundSocket NewConnection = { 0 };
     // Counter of existing connections of connecting IP
