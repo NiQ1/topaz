@@ -25,7 +25,7 @@ FFXILoginPacket::~FFXILoginPacket()
     LOG_DEBUG0("Called.");
 }
 
-void FFXILoginPacket::SendPacket(FFXI_PACKET_TYPES eType, uint8_t* pData, uint32_t cbData)
+void FFXILoginPacket::SendPacket(FFXI_LOGIN_PACKET_TYPES eType, uint8_t* pData, uint32_t cbData)
 {
     LOG_DEBUG0("Called.");
     if (cbData + sizeof(FFXI_LOGIN_PACKET_HEADER) > MAX_PACKET_SIZE_ALLOWED) {
@@ -58,7 +58,7 @@ void FFXILoginPacket::SendError(FFXI_ERROR_CODES ErrorCode)
     FFXI_ERROR_PACKET ErrorPacket;
     ErrorPacket.dwErrorCode = static_cast<uint32_t>(ErrorCode);
     ErrorPacket.dwZero = 0;
-    SendPacket(FFXI_TYPE_ERROR, reinterpret_cast<uint8_t*>(&ErrorPacket), sizeof(ErrorPacket));
+    SendPacket(FFXI_LOGIN_TYPE_ERROR, reinterpret_cast<uint8_t*>(&ErrorPacket), sizeof(ErrorPacket));
 }
 
 void FFXILoginPacket::SendDone()
@@ -66,5 +66,5 @@ void FFXILoginPacket::SendDone()
     LOG_DEBUG1("Sending done packet.");
     // Body is 4 bytes, meaning is unknown
     uint32_t dwBody = 0;
-    SendPacket(FFXI_TYPE_DONE, reinterpret_cast<uint8_t*>(&dwBody), sizeof(dwBody));
+    SendPacket(FFXI_LOGIN_TYPE_DONE, reinterpret_cast<uint8_t*>(&dwBody), sizeof(dwBody));
 }

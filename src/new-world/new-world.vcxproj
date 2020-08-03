@@ -119,11 +119,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BitSet.h" />
     <ClInclude Include="CharCreateHnd.h" />
     <ClInclude Include="FFXISearchPacket.h" />
     <ClInclude Include="WorldGlobalConfig.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BitSet.c" />
     <ClCompile Include="CharCreateHnd.cpp" />
     <ClCompile Include="FFXISearchPacket.cpp" />
     <ClCompile Include="WorldGlobalConfig.cpp" />

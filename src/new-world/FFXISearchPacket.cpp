@@ -48,11 +48,15 @@ std::shared_ptr<uint8_t> FFXISearchPacket::ReceivePacket()
     const FFXI_PACKET_HEADER* header = reinterpret_cast<const FFXI_PACKET_HEADER*>(data);
     // The encryption key rotates with each packet. The last 4 bytes
     // of each packet are the 4 bytes that rotate. The rest of the
-    // key remains constant.
+    // key remains constant. Note that packets sent from the client to the
+    // server only use the first 20 bytes of the key.
     *reinterpret_cast<uint32_t*>(mbufPacketKey + 16) = *reinterpret_cast<const uint32_t*>(data + header->dwPacketSize - 4);
-    // And decrypt
+    // And decrypt. Note that the final key is actually the MD5 hash of the
+    // key currently installed.
+    uint8_t keyMD5[16];
+    MD5(mbufPacketKey, 20, keyMD5);
     BLOWFISH_MOD_KEY KeyTable;
-    bfmod_init_table(&KeyTable, reinterpret_cast<char*>(mbufPacketKey), sizeof(mbufPacketKey));
+    bfmod_init_table(&KeyTable, reinterpret_cast<char*>(keyMD5), 16);
     // Offset 8 because size and magic parts of the header are not encrypted
     // Minus 28 bytes for size (4 bytes), magic (4 bytes), MD5 (16 bytes) and rotating key part (4 bytes)
     bfmod_decrypt_inplace(&KeyTable, reinterpret_cast<char*>(data + 8), header->dwPacketSize - 28);
@@ -64,6 +68,9 @@ std::shared_ptr<uint8_t> FFXISearchPacket::ReceivePacket()
          LOG_WARNING("Packet decryption failed (MD5 mismatch).");
          throw std::runtime_error("Packet decryption failed.");
     }
+    // On the decrypted packet, the DWORD at offset -24 from the end becomes
+    // the last DWORD of the key of the reply.
+    reinterpret_cast<uint32_t*>(mbufPacketKey)[5] = *reinterpret_cast<uint32_t*>(data + header->dwPacketSize - 24);
 }
 
 void FFXISearchPacket::SendPacket(uint8_t* pPacket)
@@ -81,8 +88,10 @@ void FFXISearchPacket::SendPacket(uint8_t* pPacket)
     // We don't really bother rotating the key ourselves
     *reinterpret_cast<uint32_t*>(pPacketCopy.get() + pHeader->dwPacketSize - 4) = *reinterpret_cast<uint32_t*>(mbufPacketKey + 16);
     // Encrypt everything
+    uint8_t keyMD5[16];
+    MD5(mbufPacketKey, 24, keyMD5);
     BLOWFISH_MOD_KEY KeyTable;
-    bfmod_init_table(&KeyTable, reinterpret_cast<char*>(mbufPacketKey), sizeof(mbufPacketKey));
+    bfmod_init_table(&KeyTable, reinterpret_cast<char*>(keyMD5), 16);
     bfmod_encrypt_inplace(&KeyTable, reinterpret_cast<char*>(pPacketCopy.get() + 8), pHeader->dwPacketSize - 28);
     // Can send now
     FFXIPacket::SendPacket(pPacketCopy.get());

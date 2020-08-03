@@ -1,6 +1,5 @@
 #include "BlowfishMod.h"
 #include <string.h>
-#include <openssl/md5.h>
 
 // Standard initial Blowfish table. This is a hex representation of
 // the first digits of Pi.

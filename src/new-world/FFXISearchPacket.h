@@ -43,6 +43,22 @@ public:
     virtual ~FFXISearchPacket();
 
     /**
+     *  Known packet types. There may be other packet types that are
+     *  currently unknown but these are all that are documented.
+     */
+    enum FFXI_SEARCH_PACKET_TYPES
+    {
+        FFXI_SEARCH_TYPE_SEARCH_ALL = 0x00,
+        FFXI_SEARCH_TYPE_GROUP_LIST = 0x02,
+        FFXI_SEARCH_TYPE_SEARCH = 0x03,
+        FFXI_SEARCH_TYPE_AH_HISTORY_SINGLE = 0x05,
+        FFXI_SEARCH_TYPE_AH_HISTORY_STACK = 0x06,
+        FFXI_SEARCH_TYPE_SEARCH_COMMENT = 0x08,
+        FFXI_SEARCH_TYPE_AH_REQUEST_MORE = 0x10,
+        FFXI_SEARCH_TYPE_AH_REQUEST = 0x15
+    };
+
+    /**
      *  Receive a packet from the network.
      *  @return pointer to the received data, including header. The packet data follows the header.
      */

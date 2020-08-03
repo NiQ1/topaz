@@ -85,10 +85,10 @@ void ViewHandler::Run()
                 pPayloadData = pRawData.get() + sizeof(FFXILoginPacket::FFXI_PACKET_HEADER);
 
                 switch (pPacketHeader->dwPacketType) {
-                case FFXILoginPacket::FFXI_TYPE_GET_FEATURES:
+                case FFXILoginPacket::FFXI_LOGIN_TYPE_GET_FEATURES:
                     CheckVersionAndSendFeatures(pPayloadData);
                     break;
-                case FFXILoginPacket::FFXI_TYPE_GET_CHARACTER_LIST:
+                case FFXILoginPacket::FFXI_LOGIN_TYPE_GET_CHARACTER_LIST:
                     // Make sure the data server has already installed the character list,
                     // otherwise wait for it.
                     mbReceivedSendCharListClient = true;
@@ -96,19 +96,19 @@ void ViewHandler::Run()
                         SendCharacterList();
                     }
                     break;
-                case FFXILoginPacket::FFXI_TYPE_GET_WORLD_LIST:
+                case FFXILoginPacket::FFXI_LOGIN_TYPE_GET_WORLD_LIST:
                     SendWorldList();
                     break;
-                case FFXILoginPacket::FFXI_TYPE_LOGIN_REQUEST:
+                case FFXILoginPacket::FFXI_LOGIN_TYPE_LOGIN_REQUEST:
                     HandleLoginRequest(reinterpret_cast<LOGIN_REQUEST_PACKET*>(pPayloadData));
                     break;
-                case FFXILoginPacket::FFXI_TYPE_CREATE_CHARACTER:
+                case FFXILoginPacket::FFXI_LOGIN_TYPE_CREATE_CHARACTER:
                     PrepareNewCharacter(reinterpret_cast<CREATE_REQUEST_PACKET*>(pPayloadData));
                     break;
-                case FFXILoginPacket::FFXI_TYPE_CREATE_CHAR_CONFIRM:
+                case FFXILoginPacket::FFXI_LOGIN_TYPE_CREATE_CHAR_CONFIRM:
                     ConfirmNewCharacter(reinterpret_cast<CONFIRM_CREATE_REQUEST_PACKET*>(pPayloadData));
                     break;
-                case FFXILoginPacket::FFXI_TYPE_DELETE_CHARACTER:
+                case FFXILoginPacket::FFXI_LOGIN_TYPE_DELETE_CHARACTER:
                     DeleteCharacter(reinterpret_cast<DELETE_REQUEST_PACKET*>(pPayloadData));
                     break;
                 default:
@@ -230,7 +230,7 @@ void ViewHandler::CheckVersionAndSendFeatures(const uint8_t* pRequestPacket)
     // Also save the data to session because we'll need to send it to MQ later on
     mpSession->SetExpansionsBitmask(ExpFeatures.dwExpansions);
     mpSession->SetFeaturesBitmask(ExpFeatures.dwFeatures);
-    mParser.SendPacket(FFXILoginPacket::FFXI_TYPE_FEATURES_LIST, reinterpret_cast<uint8_t*>(&ExpFeatures), sizeof(ExpFeatures));
+    mParser.SendPacket(FFXILoginPacket::FFXI_LOGIN_TYPE_FEATURES_LIST, reinterpret_cast<uint8_t*>(&ExpFeatures), sizeof(ExpFeatures));
 }
 
 void ViewHandler::SendCharacterList()
@@ -281,7 +281,7 @@ void ViewHandler::SendCharacterList()
         CharListPacket.CharList[i].Details.wZone2 = pCurrentChar->wZone;
     }
     LOG_DEBUG1("Sending character list.");
-    mParser.SendPacket(FFXILoginPacket::FFXI_TYPE_CHARACTER_LIST, reinterpret_cast<uint8_t*>(&CharListPacket), sizeof(CharListPacket));
+    mParser.SendPacket(FFXILoginPacket::FFXI_LOGIN_TYPE_CHARACTER_LIST, reinterpret_cast<uint8_t*>(&CharListPacket), sizeof(CharListPacket));
     LOG_DEBUG1("Character list sent.");
 }
 
@@ -306,7 +306,7 @@ void ViewHandler::SendWorldList()
         dwWorldListPacketSize = WorldMgr->GetUserWorldsPacketSize();
     }
     LOG_DEBUG1("Sending world list.");
-    mParser.SendPacket(FFXILoginPacket::FFXI_TYPE_WORLD_LIST, pWorldListPacket.get(), dwWorldListPacketSize);
+    mParser.SendPacket(FFXILoginPacket::FFXI_LOGIN_TYPE_WORLD_LIST, pWorldListPacket.get(), dwWorldListPacketSize);
     LOG_DEBUG1("World list sent.");
 }
 
@@ -399,7 +399,7 @@ void ViewHandler::CompleteLoginRequest(std::shared_ptr<uint8_t> pMQMessage, uint
     ConfirmPacket.wSearchPort = pResponseMessage->wSearchPort;
     ConfirmPacket.wZero2 = 0;
     LOG_INFO("Character %s (%d) successfully logged-in.", ConfirmPacket.szCharacterName, ConfirmPacket.dwCharacterID);
-    mParser.SendPacket(FFXILoginPacket::FFXI_TYPE_LOGIN_RESPONSE, reinterpret_cast<uint8_t*>(&ConfirmPacket), sizeof(ConfirmPacket));
+    mParser.SendPacket(FFXILoginPacket::FFXI_LOGIN_TYPE_LOGIN_RESPONSE, reinterpret_cast<uint8_t*>(&ConfirmPacket), sizeof(ConfirmPacket));
     // At this point the client should switch to the zone server, our job's
     // done so drop the connection.
     mbShutdown = true;
