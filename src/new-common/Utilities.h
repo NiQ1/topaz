@@ -13,6 +13,9 @@
 #include <istream>
 #include <memory>
 
+#define ffxi_min(a,b) (((a)<(b)) ? (a) : (b))
+#define ffxi_max(a,b) (((a)>(b)) ? (a) : (b))
+
 /**
  *  Format a string in a C-printf fansion given varargs and return
  *  as C++ string.

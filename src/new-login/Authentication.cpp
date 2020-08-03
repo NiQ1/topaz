@@ -129,7 +129,7 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         mLastError = AUTH_SUCCESS;
         uint32_t dwAccountId = pAccountsFound->get_unsigned32(0);
         // Associate content ids with this account so it can actually create characters
-        uint8_t cContentIds = min(static_cast<uint8_t>(Config->GetConfigUInt("new_account_content_ids")), 16);
+        uint8_t cContentIds = ffxi_min(static_cast<uint8_t>(Config->GetConfigUInt("new_account_content_ids")), 16);
         strSqlQueryFmt = "INSERT INTO %scontents (account_id) VALUES (%d);";
         strSqlFinalQuery = FormatString(&strSqlQueryFmt,
             Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str());
