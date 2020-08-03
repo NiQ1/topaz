@@ -243,7 +243,7 @@ void ViewHandler::SendCharacterList()
     CleanHalfCreatedCharacters();
     // Load character list from DB into session
     mpSession->LoadCharacterList();
-    uint8_t cNumCharsAllowed = min(mpSession->GetNumCharsAllowed(), 16);
+    uint8_t cNumCharsAllowed = ffxi_min(mpSession->GetNumCharsAllowed(), 16);
     const CHARACTER_ENTRY* pCurrentChar;
     WorldManagerPtr WorldMgr = WorldManager::GetInstance();
 
