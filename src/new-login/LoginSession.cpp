@@ -186,7 +186,7 @@ void LoginSession::LoadCharacterList()
 
     // First, query all content ids, which should be in the table even if not
     // yet associated with a character.
-    std::string strSqlQueryFmt("SELECT content_id, enabled FROM %sacontents WHERE account_id=%d ORDER BY content_id LIMIT 16;");
+    std::string strSqlQueryFmt("SELECT content_id, enabled FROM %scontents WHERE account_id=%d ORDER BY content_id LIMIT 16;");
     std::string strSqlFinalQuery(FormatString(&strSqlQueryFmt,
         Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(),
         mdwAccountId));

@@ -254,6 +254,7 @@ void ViewHandler::SendCharacterList()
         CharListPacket.CharList[i].dwEnabled = pCurrentChar->bEnabled;
         if (pCurrentChar->szCharName[0] == ' ') {
             // This content ID is not associated with a character so don't do meaningless work
+            CharListPacket.CharList[i].szCharacterName[0] = ' ';
             continue;
         }
         CharListPacket.CharList[i].dwCharacterID = pCurrentChar->dwCharacterID;

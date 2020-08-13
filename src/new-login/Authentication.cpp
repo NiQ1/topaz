@@ -132,7 +132,7 @@ uint32_t Authentication::CreateUser(const char* pszUsername, const char* pszPass
         uint8_t cContentIds = ffxi_min(static_cast<uint8_t>(Config->GetConfigUInt("new_account_content_ids")), 16);
         strSqlQueryFmt = "INSERT INTO %scontents (account_id) VALUES (%d);";
         strSqlFinalQuery = FormatString(&strSqlQueryFmt,
-            Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str());
+            Database::RealEscapeString(Config->GetConfigString("db_prefix")).c_str(), dwAccountId);
         for (uint8_t i = 0; i < cContentIds; i++) {
             DB->insert(strSqlFinalQuery);
         }

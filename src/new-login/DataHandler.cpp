@@ -55,21 +55,23 @@ void DataHandler::Run()
     while ((mbShutdown == false) && (bError == false)) {
 
         // Maybe we have a request from the view server
-        RequestFromView = mpSession->GetRequestFromViewServer();
-        if (RequestFromView != LoginSession::DATA_SERVER_IDLE) {
-            if (RequestFromView == LoginSession::DATA_SERVER_ASK_FOR_KEY) {
-                cOutgoingBytePacket = static_cast<uint8_t>(S2C_PACKET_SEND_KEY);
-                if (mpConnection->WriteAll(&cOutgoingBytePacket, sizeof(cOutgoingBytePacket)) != sizeof(cOutgoingBytePacket)) {
-                    LOG_WARNING("Client dropped the connection.");
+        if (mpSession.get() != NULL) {
+            RequestFromView = mpSession->GetRequestFromViewServer();
+            if (RequestFromView != LoginSession::DATA_SERVER_IDLE) {
+                if (RequestFromView == LoginSession::DATA_SERVER_ASK_FOR_KEY) {
+                    cOutgoingBytePacket = static_cast<uint8_t>(S2C_PACKET_SEND_KEY);
+                    if (mpConnection->WriteAll(&cOutgoingBytePacket, sizeof(cOutgoingBytePacket)) != sizeof(cOutgoingBytePacket)) {
+                        LOG_WARNING("Client dropped the connection.");
+                        break;
+                    }
+                }
+                else {
+                    LOG_ERROR("Unknown data server state.");
                     break;
                 }
+                // Clear our own state machine
+                mpSession->SendRequestToDataServer(LoginSession::DATA_SERVER_IDLE);
             }
-            else {
-                LOG_ERROR("Unknown data server state.");
-                break;
-            }
-            // Clear our own state machine
-            mpSession->SendRequestToDataServer(LoginSession::DATA_SERVER_IDLE);
         }
 
         // Check for response from the client
